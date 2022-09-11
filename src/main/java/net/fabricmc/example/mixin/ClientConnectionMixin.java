@@ -19,50 +19,33 @@ public class ClientConnectionMixin
     @Inject(at = @At("TAIL"), method = "send(Lnet/minecraft/network/Packet;)V", cancellable = true)
     public void send(Packet<?> packet, CallbackInfo ci)
     {
-        // FMod.LOGGER.info(packet.getClass().getName());
-        if(!Vars.bypassLo) {
+        if(!Vars.bypassLo)
+        {
             return;
         }
 
         if (packet instanceof PlayerMoveC2SPacket movePacket)
         {
-            double z = movePacket.getZ(Double.MAX_VALUE);
-            double x = movePacket.getX(Double.MAX_VALUE);
-            if(x == Double.MAX_VALUE || z == Double.MAX_VALUE)
+            var z = Util.roundToDirection(movePacket.getZ(Double.MAX_VALUE));
+            var x = Util.roundToDirection(movePacket.getX(Double.MAX_VALUE));
+
+            if((x * 1000.0) % 10 != 0 || (z * 1000.0) % 10 != 0)
             {
-                // FMod.LOGGER.info("XZ was undef");
                 ci.cancel();
             }
+            ((PlayerMoveC2SPacketAccessor) packet).setX(x);
+            ((PlayerMoveC2SPacketAccessor) packet).setZ(z);
 
-            float pitch = movePacket.getPitch(Float.MAX_VALUE);
-            float yaw = movePacket.getYaw(Float.MAX_VALUE);
-            if(pitch == Float.MAX_VALUE || yaw == Float.MAX_VALUE)
-            {
-                // FMod.LOGGER.info("XZ was undef py");
-                ci.cancel();
-            }
-
-            if((x * 1000) % 10 != 0 || (z * 1000) % 10 != 0)
+            var pitch = Util.roundToDirection(movePacket.getPitch(Float.MAX_VALUE));
+            var yaw = Util.roundToDirection(movePacket.getYaw(Float.MAX_VALUE));
+            if((pitch * 1000.f) % 10 != 0 || (yaw * 1000.f) % 10 != 0)
             {
                 ci.cancel();
             }
 
-            x = Util.roundToDirection(x);
-            z = Util.roundToDirection(z);
-
-            pitch = Util.roundToDirection(pitch);
-            yaw = Util.roundToDirection(yaw);
-
-            if((x * 1000) % 10 != 0 || (z * 1000) % 10 != 0) {
-                ci.cancel();
-            }
-
-            ((PlayerMoveC2SPacketAccessor) packet).setX(Util.roundToDirection(x));
-            ((PlayerMoveC2SPacketAccessor) packet).setZ(Util.roundToDirection(z));
-
-            ((PlayerMoveC2SPacketAccessor) packet).setPitch(Util.roundToDirection(pitch));
-            ((PlayerMoveC2SPacketAccessor) packet).setYaw(Util.roundToDirection(yaw));
-            FMod.LOGGER.info(String.format("Fuck you: %f, %f, %f, %f", Util.roundToDirection(x), Util.roundToDirection(z), Util.roundToDirection(pitch), Util.roundToDirection(yaw)));
+            ((PlayerMoveC2SPacketAccessor) packet).setPitch(pitch);
+            ((PlayerMoveC2SPacketAccessor) packet).setYaw(yaw);
+            FMod.LOGGER.info(String.format("XZPY: %f, %f, %f, %f", x, z, pitch, yaw));
         }
 
         if (packet instanceof VehicleMoveC2SPacket movePacket)
