@@ -4,12 +4,15 @@ import net.fabricmc.example.FMod;
 import net.fabricmc.example.Util;
 import net.fabricmc.example.Vars;
 import net.minecraft.client.network.ClientPlayerEntity;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.text.Text;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+
+import static net.fabricmc.example.Util.CLIENT;
 
 @Mixin(ClientPlayerEntity.class)
 public abstract class ClientPlayerEntityMixin {
@@ -35,6 +38,16 @@ public abstract class ClientPlayerEntityMixin {
             String udi = Vars.bypassLo ? "Disabled" : "Toggled";
             Util.log(udi + " bypass");
             Vars.bypassLo = !Vars.bypassLo;
+            ci.cancel();
+        }
+
+        if(message.equalsIgnoreCase(Util.commandPrefix + "vclip"))
+        {
+            if(CLIENT.player != null)
+            {
+                PlayerEntity player = CLIENT.player;
+                player.setPos(player.getX(), player.getY() - 5, player.getZ());
+            }
             ci.cancel();
         }
     }
