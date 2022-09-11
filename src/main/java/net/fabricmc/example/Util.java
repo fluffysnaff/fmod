@@ -6,6 +6,7 @@ import net.minecraft.text.Text;
 public class Util
 {
     public static final MinecraftClient CLIENT = MinecraftClient.getInstance();
+    public static String commandPrefix = "^";
 
     public static double roundToDirection(double val)
     {

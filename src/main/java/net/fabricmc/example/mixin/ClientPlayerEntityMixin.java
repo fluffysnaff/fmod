@@ -22,7 +22,7 @@ public abstract class ClientPlayerEntityMixin {
 
     @Inject(at = @At("HEAD"), method = "sendChatMessage", cancellable = true)
     public void sendChatMessage(String message, Text preview, CallbackInfo ci) {
-        if (message.equalsIgnoreCase(".toggle boatfly"))
+        if (message.equalsIgnoreCase(Util.commandPrefix + "toggle boatfly"))
         {
             String udi = Vars.boatFly ? "Disabled" : "Toggled";
             Util.log(udi + " boatfly");
@@ -30,7 +30,7 @@ public abstract class ClientPlayerEntityMixin {
             ci.cancel();
         }
 
-        if (message.equalsIgnoreCase(".toggle bypass"))
+        if (message.equalsIgnoreCase(Util.commandPrefix + "toggle bypass"))
         {
             String udi = Vars.bypassLo ? "Disabled" : "Toggled";
             Util.log(udi + " bypass");
