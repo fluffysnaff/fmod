@@ -12,14 +12,14 @@ public class Util
     {
         var rounded = Math.round(val * 100.0) / 100.0;
         var dir = Math.nextAfter(rounded, rounded + Math.signum(val));
-        return Math.round(dir * 100.0) / 100.0;
+        return Math.round(dir * 1000.0) / 1000.0;
     }
 
     public static float roundToDirection(float val)
     {
         var rounded = Math.round(val * 100.0) / 100.0;
         var dir = Math.nextAfter(rounded, rounded + Math.signum(val));
-        return (float)(Math.round(dir * 100.0) / 100.0);
+        return (float)(Math.round(dir * 1000.0) / 1000.0);
     }
 
     public static void log(String msg)

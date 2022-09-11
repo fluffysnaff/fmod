@@ -50,31 +50,26 @@ public class ClientConnectionMixin
 
         if (packet instanceof VehicleMoveC2SPacket movePacket)
         {
-            double z = movePacket.getZ();
-            double x = movePacket.getX();
-            float pitch = movePacket.getPitch();
-            float yaw = movePacket.getYaw();
+            var z = Util.roundToDirection(movePacket.getZ());
+            var x = Util.roundToDirection(movePacket.getX());
 
-            if((x * 1000) % 10 != 0 || (z * 1000) % 10 != 0) {
+            if((x * 1000.0) % 10 != 0 || (z * 1000.0) % 10 != 0)
+            {
+                ci.cancel();
+            }
+            ((VehicleMoveC2SPacketAccessor) packet).setX(x);
+            ((VehicleMoveC2SPacketAccessor) packet).setZ(z);
+
+            var pitch = Util.roundToDirection(movePacket.getPitch());
+            var yaw =Util.roundToDirection( movePacket.getYaw());
+            if((x * 1000) % 10 != 0 || (z * 1000) % 10 != 0)
+            {
                 ci.cancel();
             }
 
-            x = Util.roundToDirection(x);
-            z = Util.roundToDirection(z);
-
-            pitch = Util.roundToDirection(pitch);
-            yaw = Util.roundToDirection(yaw);
-
-            if((x * 1000) % 10 != 0 || (z * 1000) % 10 != 0) {
-                ci.cancel();
-            }
-
-            ((VehicleMoveC2SPacketAccessor) packet).setX(Util.roundToDirection(x));
-            ((VehicleMoveC2SPacketAccessor) packet).setZ(Util.roundToDirection(z));
-
-            ((VehicleMoveC2SPacketAccessor) packet).setPitch(Util.roundToDirection(pitch));
-            ((VehicleMoveC2SPacketAccessor) packet).setYaw(Util.roundToDirection(yaw));
-            FMod.LOGGER.info(String.format("Fuck you on a vehicle: %f, %f, %f, %f", Util.roundToDirection(x), Util.roundToDirection(z), Util.roundToDirection(pitch), Util.roundToDirection(yaw)));
+            ((VehicleMoveC2SPacketAccessor) packet).setPitch(pitch);
+            ((VehicleMoveC2SPacketAccessor) packet).setYaw(yaw);
+            FMod.LOGGER.info(String.format("XZPY: %f, %f, %f, %f", x, z, pitch, yaw));
         }
     }
 }
