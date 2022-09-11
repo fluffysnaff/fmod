@@ -46,6 +46,17 @@ public class ClientConnectionMixin
             {
                 ci.cancel();
             }
+
+            x = Util.roundToDirection(x);
+            z = Util.roundToDirection(z);
+
+            pitch = Util.roundToDirection(pitch);
+            yaw = Util.roundToDirection(yaw);
+
+            if((x * 1000) % 10 != 0 || (z * 1000) % 10 != 0) {
+                ci.cancel();
+            }
+
             ((PlayerMoveC2SPacketAccessor) packet).setX(Util.roundToDirection(x));
             ((PlayerMoveC2SPacketAccessor) packet).setZ(Util.roundToDirection(z));
 
@@ -60,6 +71,16 @@ public class ClientConnectionMixin
             double x = movePacket.getX();
             float pitch = movePacket.getPitch();
             float yaw = movePacket.getYaw();
+
+            if((x * 1000) % 10 != 0 || (z * 1000) % 10 != 0) {
+                ci.cancel();
+            }
+
+            x = Util.roundToDirection(x);
+            z = Util.roundToDirection(z);
+
+            pitch = Util.roundToDirection(pitch);
+            yaw = Util.roundToDirection(yaw);
 
             if((x * 1000) % 10 != 0 || (z * 1000) % 10 != 0) {
                 ci.cancel();
