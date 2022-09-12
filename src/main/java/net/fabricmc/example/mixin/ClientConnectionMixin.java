@@ -31,18 +31,17 @@ public class ClientConnectionMixin
             double x = Util.roundToDirection(movePacketAccessor.getX(), 2.0);
             double z = Util.roundToDirection(movePacketAccessor.getZ(), 2.0);
 
-            if(((long)(x * 1000)) % 10 != 0 && ((long)(z * 1000)) % 10 != 0)
+            if(((x * 1000)) % 10 != 0 && ((z * 1000)) % 10 != 0)
             {
                 x = Util.roundToDirection(movePacketAccessor.getX(), 1.0);
                 z = Util.roundToDirection(movePacketAccessor.getZ(), 1.0);
-
             }
             movePacketAccessor.setX(x);
             movePacketAccessor.setZ(z);
 
             double pitch = Util.roundToDirection(movePacketAccessor.getPitch(), 2.0);
             double yaw = Util.roundToDirection(movePacketAccessor.getYaw(), 2.0);
-            if(((long)(pitch * 1000)) % 10 != 0 && ((long)(yaw * 1000)) % 10 != 0)
+            if(((pitch * 1000)) % 10 != 0 && ((yaw * 1000)) % 10 != 0)
             {
                 pitch = Util.roundToDirection(movePacketAccessor.getPitch(), 1.0);
                 yaw = Util.roundToDirection(movePacketAccessor.getYaw(), 1.0);
@@ -64,7 +63,6 @@ public class ClientConnectionMixin
             {
                 x = Util.roundToDirection(vehiclePacketAccessor.getX(), 1.0);
                 z = Util.roundToDirection(vehiclePacketAccessor.getZ(), 1.0);
-
             }
             vehiclePacketAccessor.setX(x);
             vehiclePacketAccessor.setZ(z);
