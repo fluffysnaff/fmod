@@ -7,6 +7,7 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 
 @Mixin(VehicleMoveC2SPacket.class)
 public interface VehicleMoveC2SPacketAccessor {
+    // Set
     @Mutable
     @Accessor("x")
     void setX(double x);
@@ -25,4 +26,17 @@ public interface VehicleMoveC2SPacketAccessor {
     @Mutable
     @Accessor("pitch")
     void setPitch(float pitch);
+
+    // Get
+    @Accessor("x")
+    double getX();
+
+    @Accessor("z")
+    double getZ();
+
+    @Accessor("yaw")
+    float getYaw();
+
+    @Accessor("pitch")
+    float getPitch();
 }

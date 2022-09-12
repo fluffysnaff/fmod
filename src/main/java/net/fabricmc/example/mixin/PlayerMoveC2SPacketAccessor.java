@@ -7,6 +7,7 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 
 @Mixin(PlayerMoveC2SPacket.class)
 public interface PlayerMoveC2SPacketAccessor {
+    // Set
     @Mutable
     @Accessor("x")
     void setX(double x);
@@ -30,6 +31,7 @@ public interface PlayerMoveC2SPacketAccessor {
     @Accessor("onGround")
     void setOnGround(boolean onGround);
 
+    // Get
     @Accessor("x")
     double getX();
 
