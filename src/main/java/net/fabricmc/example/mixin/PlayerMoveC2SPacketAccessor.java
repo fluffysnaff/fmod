@@ -29,4 +29,16 @@ public interface PlayerMoveC2SPacketAccessor {
     @Mutable
     @Accessor("onGround")
     void setOnGround(boolean onGround);
+
+    @Accessor("x")
+    double getX();
+
+    @Accessor("z")
+    double getZ();
+
+    @Accessor("yaw")
+    float getYaw();
+
+    @Accessor("pitch")
+    float getPitch();
 }

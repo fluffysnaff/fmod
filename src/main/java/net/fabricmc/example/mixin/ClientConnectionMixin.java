@@ -26,50 +26,55 @@ public class ClientConnectionMixin
 
         if (packet instanceof PlayerMoveC2SPacket movePacket)
         {
-            var z = Util.roundToDirection(movePacket.getZ(Double.MAX_VALUE));
-            var x = Util.roundToDirection(movePacket.getX(Double.MAX_VALUE));
+            var movePacketAccessor = (PlayerMoveC2SPacketAccessor) movePacket;
 
-            if((x * 1000.0) % 10 != 0 || (z * 1000.0) % 10 != 0)
+            double x = Util.roundToDirection(movePacketAccessor.getX(), 2.0);
+            double z = Util.roundToDirection(movePacketAccessor.getZ(), 2.0);
+
+            if(((long)(x * 1000)) % 10 != 0 && ((long)(z * 1000)) % 10 != 0)
             {
-                ci.cancel();
-            }
-            ((PlayerMoveC2SPacketAccessor) packet).setX(x);
-            ((PlayerMoveC2SPacketAccessor) packet).setZ(z);
+                x = Util.roundToDirection(movePacketAccessor.getX(), 1.0);
+                z = Util.roundToDirection(movePacketAccessor.getZ(), 1.0);
 
-            var pitch = Util.roundToDirection(movePacket.getPitch(Float.MAX_VALUE));
-            var yaw = Util.roundToDirection(movePacket.getYaw(Float.MAX_VALUE));
-            if((pitch * 1000.f) % 10 != 0 || (yaw * 1000.f) % 10 != 0)
+            }
+            movePacketAccessor.setX(x);
+            movePacketAccessor.setZ(z);
+
+            double pitch = Util.roundToDirection(movePacketAccessor.getPitch(), 2.0);
+            double yaw = Util.roundToDirection(movePacketAccessor.getYaw(), 2.0);
+            if(((long)(pitch * 1000)) % 10 != 0 && ((long)(yaw * 1000)) % 10 != 0)
             {
-                ci.cancel();
+                pitch = Util.roundToDirection(movePacketAccessor.getPitch(), 1.0);
+                yaw = Util.roundToDirection(movePacketAccessor.getYaw(), 1.0);
             }
 
-            ((PlayerMoveC2SPacketAccessor) packet).setPitch(pitch);
-            ((PlayerMoveC2SPacketAccessor) packet).setYaw(yaw);
+            movePacketAccessor.setPitch((float)pitch);
+            movePacketAccessor.setYaw((float)yaw);
             FMod.LOGGER.info(String.format("XZPY: %f, %f, %f, %f", x, z, pitch, yaw));
         }
 
-        if (packet instanceof VehicleMoveC2SPacket movePacket)
-        {
-            var z = Util.roundToDirection(movePacket.getZ());
-            var x = Util.roundToDirection(movePacket.getX());
+        // if (packet instanceof VehicleMoveC2SPacket movePacket)
+        // {
+        //     var z = Util.roundToDirection(movePacket.getZ());
+        //     var x = Util.roundToDirection(movePacket.getX());
 
-            if((x * 1000.0) % 10 != 0 || (z * 1000.0) % 10 != 0)
-            {
-                ci.cancel();
-            }
-            ((VehicleMoveC2SPacketAccessor) packet).setX(x);
-            ((VehicleMoveC2SPacketAccessor) packet).setZ(z);
+        //     if((x * 1000.0) % 10 != 0 || (z * 1000.0) % 10 != 0)
+        //     {
+        //         ci.cancel();
+        //     }
+        //     ((VehicleMoveC2SPacketAccessor) packet).setX(x);
+        //     ((VehicleMoveC2SPacketAccessor) packet).setZ(z);
 
-            var pitch = Util.roundToDirection(movePacket.getPitch());
-            var yaw =Util.roundToDirection( movePacket.getYaw());
-            if((x * 1000) % 10 != 0 || (z * 1000) % 10 != 0)
-            {
-                ci.cancel();
-            }
+        //     var pitch = Util.roundToDirection(movePacket.getPitch());
+        //     var yaw =Util.roundToDirection( movePacket.getYaw());
+        //     if((x * 1000) % 10 != 0 || (z * 1000) % 10 != 0)
+        //     {
+        //         ci.cancel();
+        //     }
 
-            ((VehicleMoveC2SPacketAccessor) packet).setPitch(pitch);
-            ((VehicleMoveC2SPacketAccessor) packet).setYaw(yaw);
-            FMod.LOGGER.info(String.format("XZPY: %f, %f, %f, %f", x, z, pitch, yaw));
-        }
+        //     ((VehicleMoveC2SPacketAccessor) packet).setPitch(pitch);
+        //     ((VehicleMoveC2SPacketAccessor) packet).setYaw(yaw);
+        //     FMod.LOGGER.info(String.format("XZPY: %f, %f, %f, %f", x, z, pitch, yaw));
+        // }
     }
 }

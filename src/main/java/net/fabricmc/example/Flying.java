@@ -17,7 +17,7 @@ public class Flying
             {
                 double z = vehicle.getZ();
                 double x = vehicle.getX();
-                vehicle.setPos(Util.roundToDirection(x), vehicle.getY(), Util.roundToDirection(z));
+                vehicle.setPos(Util.roundToDirection(x, 1.0), vehicle.getY(), Util.roundToDirection(z, 1.0));
             }
             Vec3d velocity = vehicle.getVelocity();
             double motionY = CLIENT.options.sprintKey.isPressed() ? -0.5 : (CLIENT.options.jumpKey.isPressed() ? 0.5 : 0);

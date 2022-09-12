@@ -8,18 +8,12 @@ public class Util
     public static final MinecraftClient CLIENT = MinecraftClient.getInstance();
     public static String commandPrefix = "^";
 
-    public static double roundToDirection(double val)
+    public static double roundToDirection(double val, double decimals)
     {
-        var rounded = Math.round(val * 100.0) / 100.0;
-        var dir = Math.nextAfter(rounded, rounded + Math.signum(val));
-        return Math.round(dir * 1000.0) / 1000.0;
-    }
-
-    public static float roundToDirection(float val)
-    {
-        var rounded = Math.round(val * 100.0) / 100.0;
-        var dir = Math.nextAfter(rounded, rounded + Math.signum(val));
-        return (float)(Math.round(dir * 1000.0) / 1000.0);
+        var round = Math.pow(10.0, decimals);
+        var rounded = Math.round(val * round) / round;
+        var dir = Math.nextAfter(rounded, rounded  + Math.signum(val));
+        return Math.round(dir * round) / round;
     }
 
     public static void log(String msg)
