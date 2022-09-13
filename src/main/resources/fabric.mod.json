@@ -4,13 +4,13 @@
   "version": "${version}",
 
   "name": "FMod",
-  "description": "This is an example description! Tell everyone what your mod is about!",
+  "description": "Best mod ever",
   "authors": [
     "Me!"
   ],
   "contact": {
     "homepage": "https://fabricmc.net/",
-    "sources": "https://github.com/FabricMC/fabric-example-mod"
+    "sources": "https://gitlab.com/fluffysnaff/fmod"
   },
 
   "license": "CC0-1.0",
