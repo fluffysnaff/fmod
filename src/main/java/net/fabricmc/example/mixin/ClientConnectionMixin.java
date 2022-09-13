@@ -36,6 +36,12 @@ public class ClientConnectionMixin
                 x = Util.roundToDirection(movePacketAccessor.getX(), 1.0);
                 z = Util.roundToDirection(movePacketAccessor.getZ(), 1.0);
             }
+
+            if((long)((x * 1000)) % 10 != 0 && (long)((z * 1000)) % 10 != 0)
+            {
+                x = Util.roundToDirection(movePacketAccessor.getX(), 0);
+                z = Util.roundToDirection(movePacketAccessor.getZ(), 0);
+            }
             movePacketAccessor.setX(x);
             movePacketAccessor.setZ(z);
 
@@ -47,6 +53,11 @@ public class ClientConnectionMixin
                 yaw = Util.roundToDirection(movePacketAccessor.getYaw(), 1.0);
             }
 
+            if((long)((pitch * 1000)) % 10 != 0 && (long)((yaw * 1000)) % 10 != 0)
+            {
+                pitch = Util.roundToDirection(movePacketAccessor.getPitch(), 0);
+                yaw = Util.roundToDirection(movePacketAccessor.getYaw(), 0);
+            }
             movePacketAccessor.setPitch((float)pitch);
             movePacketAccessor.setYaw((float)yaw);
             FMod.LOGGER.info(String.format("XZPY: %f, %f, %f, %f", x, z, pitch, yaw));
