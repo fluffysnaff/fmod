@@ -9,7 +9,8 @@
     "ClientConnectionMixin",
     "ClientPlayerEntityMixin",
     "PlayerMoveC2SPacketAccessor",
-    "VehicleMoveC2SPacketAccessor"
+    "VehicleMoveC2SPacketAccessor",
+    "PlayerPositionLookS2CPacketAccessor"
   ],
   "injectors": {
     "defaultRequire": 1
