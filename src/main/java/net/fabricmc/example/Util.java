@@ -2,6 +2,7 @@ package net.fabricmc.example;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.text.Text;
+import net.minecraft.util.math.MathHelper;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -11,9 +12,10 @@ public class Util
     public static final MinecraftClient CLIENT = MinecraftClient.getInstance();
     public static String commandPrefix = "^";
 
-    public static BigDecimal roundToDirection(BigDecimal val, int decimals)
+    public static double round(double val, int decimals)
     {
-        return val.setScale(decimals, RoundingMode.FLOOR);
+        int multiplier = (int) Math.pow(10, decimals);
+        return ((double) ((long) ((val) * multiplier)) / multiplier);
     }
 
     public static void log(String msg)
