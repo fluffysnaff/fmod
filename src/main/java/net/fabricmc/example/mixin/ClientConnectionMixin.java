@@ -28,8 +28,6 @@ public class ClientConnectionMixin
         {
             return;
         }
-
-        ci.cancel();
         if (packet instanceof PlayerMoveC2SPacket movePacket)
         {
             var movePacketAccessor = (PlayerMoveC2SPacketAccessor) movePacket;
@@ -37,58 +35,99 @@ public class ClientConnectionMixin
             double dx = movePacketAccessor.getX();
             double dz = movePacketAccessor.getZ();
 
-            for(int i = 5; i > 0; i--)
+            long delX = ((long)(dx * 1000)) % 10;
+            long delZ = ((long)(dz * 1000)) % 10;
+
+            dx = ((dx * 1000) - delX) / 1000;
+            dz = ((dz * 1000) - delZ) / 1000;
+
+            if ((((long) (dx * 1000)) % 10 != 0 && ((long) (dz * 1000)) % 10 != 0))
             {
-                if ((((long) (dx * 1000)) % 10 != 0 && ((long) (dz * 1000)) % 10 != 0))
-                {
-                    dx = Util.round(dx, i);
-                    dz = Util.round(dz, i);
-                }
+                delX = ((long)(dx * 100)) % 10;
+                delZ = ((long)(dz * 100)) % 10;
+                dx = ((dx * 100) - delX) / 100;
+                dz = ((dz * 100) - delZ) / 100;
+                ci.cancel();
             }
+            // What does this do?
+            movePacketAccessor.setChangeLook(false);
+            movePacketAccessor.setChangePosition(false);
+
             movePacketAccessor.setX(dx);
             movePacketAccessor.setZ(dz);
 
-            movePacketAccessor.setPitch(0.f);
-            movePacketAccessor.setYaw(0.f);
-            FMod.LOGGER.info(String.format("XZPY: %f, %f, %f, %f", dx, dz, ((double)((long)dx)), ((double)((long)dz))));
+            float dp = movePacketAccessor.getPitch();
+            float dy = movePacketAccessor.getYaw();
+
+            long delP = ((long)(dp * 1000)) % 10;
+            long delY = ((long)(dy * 1000)) % 10;
+
+            dp = ((dp * 1000) - delP) / 1000;
+            dy = ((dy * 1000) - delY) / 1000;
+
+            if ((((long) (dp * 1000)) % 10 != 0 && ((long) (dy * 1000)) % 10 != 0))
+            {
+                delP = ((long)(dp * 100)) % 10;
+                delY = ((long)(dy * 100)) % 10;
+                dp = ((dp * 100) - delP) / 100;
+                dy = ((dy * 100) - delY) / 100;
+                ci.cancel();
+            }
+
+            movePacketAccessor.setPitch(dp);
+            movePacketAccessor.setYaw(dy);
+            FMod.LOGGER.info(String.format("X: %f, Z: %f, P: %f, Y: %f | DX: %f, DZ: %f, DP: %f, DY: %f", dx, dz, dp, dy, dx, dz, dp, dy));
         }
 
-        // (packet instanceof VehicleMoveC2SPacket movePacket)
-        //
-        //  var vehiclePacketAccessor = (VehicleMoveC2SPacketAccessor) movePacket;
+        if (packet instanceof VehicleMoveC2SPacket movePacket)
+        {
+            var movePacketAccessor = (VehicleMoveC2SPacketAccessor) movePacket;
+            // movePacketAccessor.setChangeLook(false);
+            // movePacketAccessor.setChangePosition(false);
 
-        //  BigDecimal x = Util.roundToDirPos(BigDecimal.valueOf(vehiclePacketAccessor.getX()), 2);
-        //  BigDecimal z = Util.roundToDirPos(BigDecimal.valueOf(vehiclePacketAccessor.getZ()), 2);
+            double dx = movePacketAccessor.getX();
+            double dz = movePacketAccessor.getZ();
 
-        //  if ((x.longValue() * 1000) % 10 != 0 && (z.longValue() * 1000) % 10 != 0)
-        //  {
-        //      x = Util.roundToDirPos(x, 1);
-        //      z = Util.roundToDirPos(z, 1);
-        //  }
+            long delX = ((long)(dx * 1000)) % 10;
+            long delZ = ((long)(dz * 1000)) % 10;
 
-        //  if ((x.longValue() * 1000) % 10 != 0 && (z.longValue() * 1000) % 10 != 0)
-        //  {
-        //      x = Util.roundToDirPos(x, 0);
-        //      z = Util.roundToDirPos(z, 0);
-        //  }
-        //  vehiclePacketAccessor.setX(x.doubleValue());
-        //  vehiclePacketAccessor.setZ(z.doubleValue());
+            dx = ((dx * 1000) - delX) / 1000;
+            dz = ((dz * 1000) - delZ) / 1000;
 
-        //  BigDecimal pitch = Util.roundToDirection(BigDecimal.valueOf(vehiclePacketAccessor.getPitch()), 2);
-        //  BigDecimal yaw = Util.roundToDirection(BigDecimal.valueOf(vehiclePacketAccessor.getYaw()), 2);
-        //  if ((pitch.longValue() * 1000) % 10 != 0 && (yaw.longValue() * 1000) % 10 != 0)
-        //  {
-        //      pitch = Util.roundToDirection(pitch, 1);
-        //      yaw = Util.roundToDirection(yaw, 1);
-        //  }
+            if ((((long) (dx * 1000)) % 10 != 0 && ((long) (dz * 1000)) % 10 != 0))
+            {
+                delX = ((long)(dx * 100)) % 10;
+                delZ = ((long)(dz * 100)) % 10;
+                dx = ((dx * 100) - delX) / 100;
+                dz = ((dz * 100) - delZ) / 100;
+                ci.cancel();
+            }
+            // movePacketAccessor.setChangeLook(false);
+            // movePacketAccessor.setChangePosition(false);
+            movePacketAccessor.setX(dx);
+            movePacketAccessor.setZ(dz);
 
-        //  if ((pitch.longValue() * 1000) % 10 != 0 &&  (yaw.longValue() * 1000) % 10 != 0)
-        //  {
-        //      pitch = Util.roundToDirection(pitch, 0);
-        //      yaw = Util.roundToDirection(yaw, 0);
-        //  }
-        //  vehiclePacketAccessor.setPitch(pitch.floatValue());
-        //  vehiclePacketAccessor.setYaw(yaw.floatValue());
-        //  FMod.LOGGER.info(String.format("XZPY: %f, %f, %f, %f", x.doubleValue(), z.doubleValue(), pitch.floatValue(), yaw.floatValue()));
+            float dp = movePacketAccessor.getPitch();
+            float dy = movePacketAccessor.getYaw();
+
+            long delP = ((long)(dp * 1000)) % 10;
+            long delY = ((long)(dy * 1000)) % 10;
+
+            dp = ((dp * 1000) - delP) / 1000;
+            dy = ((dy * 1000) - delY) / 1000;
+
+            if ((((long) (dp * 1000)) % 10 != 0 && ((long) (dy * 1000)) % 10 != 0))
+            {
+                delP = ((long)(dp * 100)) % 10;
+                delY = ((long)(dy * 100)) % 10;
+                dp = ((dp * 100) - delP) / 100;
+                dy = ((dy * 100) - delY) / 100;
+                ci.cancel();
+            }
+
+            movePacketAccessor.setPitch(dp);
+            movePacketAccessor.setYaw(dy);
+            FMod.LOGGER.info(String.format("X: %f, Z: %f, P: %f, Y: %f | DX: %f, DZ: %f, DP: %f, DY: %f", dx, dz, dp, dy, dx, dz, dp, dy));
+        }
     }
 }
