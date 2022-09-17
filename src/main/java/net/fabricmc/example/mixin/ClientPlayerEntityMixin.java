@@ -50,5 +50,13 @@ public abstract class ClientPlayerEntityMixin {
             }
             ci.cancel();
         }
+
+        if(message.equalsIgnoreCase(Util.commandPrefix + "toggle wgbypass"))
+        {
+            String udi = Vars.bypassWg ? "Disabled" : "Toggled";
+            Util.log(udi + " wgbypass");
+            Vars.bypassWg = !Vars.bypassWg;
+            ci.cancel();
+        }
     }
 }

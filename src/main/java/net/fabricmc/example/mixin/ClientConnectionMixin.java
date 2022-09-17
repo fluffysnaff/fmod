@@ -19,5 +19,6 @@ public class ClientConnectionMixin
     public void send(Packet<?> packet, CallbackInfo ci)
     {
         Bypass.MovementBypass(packet, ci);
+        Bypass.WGBypass(packet, ci);
     }
 }

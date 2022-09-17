@@ -10,6 +10,13 @@ public class Util
 {
     public static final MinecraftClient CLIENT = MinecraftClient.getInstance();
     public static String commandPrefix = "^";
+    public static double round(double val, int dec)
+    {
+        int decimals = (int)Math.pow(10, dec);
+        long subX = ((long)(val * decimals)) % 10;
+        return ((val * decimals) - subX) / decimals;
+    }
+
     public static void log(String msg)
     {
         assert CLIENT.player != null;
