@@ -3,6 +3,7 @@ package com.addon.fmod.modules;
 import com.addon.fmod.FMod;
 import meteordevelopment.meteorclient.events.entity.player.SendMovementPacketsEvent;
 import meteordevelopment.meteorclient.events.packets.PacketEvent;
+import meteordevelopment.meteorclient.mixin.PlayerPositionLookS2CPacketAccessor;
 import meteordevelopment.meteorclient.settings.BoolSetting;
 import meteordevelopment.meteorclient.settings.Setting;
 import meteordevelopment.meteorclient.settings.SettingGroup;
@@ -21,13 +22,6 @@ public class LiveWalk extends Module
 
     private final SettingGroup sgGeneral = settings.getDefaultGroup();
 
-    private final Setting<Boolean> spoofVelocity = sgGeneral.add(new BoolSetting.Builder()
-        .name("spoof-velocity")
-        .description("Spoofs your velocity to get rid of external retardation.")
-        .defaultValue(true)
-        .build()
-    );
-
     private final Setting<Boolean> spoofRotate = sgGeneral.add(new BoolSetting.Builder()
         .name("spoof-rotate")
         .description("Spoofs your rotation.")
@@ -42,23 +36,16 @@ public class LiveWalk extends Module
         .build()
     );
 
-    private final Setting<Boolean> onMoveOnly = sgGeneral.add(new BoolSetting.Builder()
-        .name("on-move-only")
-        .description("Only sends packets when moving.")
-        .defaultValue(false)
-        .build()
-    );
-
-    private final Setting<Boolean> lockYP = sgGeneral.add(new BoolSetting.Builder()
-        .name("lock-yaw-pitch")
-        .description("Blocks base yaw and base pitch.")
-        .defaultValue(false)
-        .build()
-    );
-
     private final Setting<Boolean> vehicle = sgGeneral.add(new BoolSetting.Builder()
         .name("vehicle")
         .description("Enable vehicle bypass")
+        .defaultValue(true)
+        .build()
+    );
+
+    private final Setting<Boolean> syncYP = sgGeneral.add(new BoolSetting.Builder()
+        .name("sync-yaw-pitch")
+        .description("Synchronizes base yaw and base pitch with yaw and pitch.")
         .defaultValue(false)
         .build()
     );
@@ -87,10 +74,6 @@ public class LiveWalk extends Module
     @EventHandler
     public void onSendMovementPackets(SendMovementPacketsEvent.Pre event)
     {
-        if (spoofVelocity.get())
-        {
-            sendVelocity(0, 0, 0);
-        }
         assert mc.player != null;
         double dx = mc.player.getPos().x;
         double dz = mc.player.getPos().z;
@@ -100,41 +83,32 @@ public class LiveWalk extends Module
             dz = mc.player.getVehicle().getZ();
         }
 
+        // First round the thousandths
         dx = round(dx, 3);
         dz = round(dz, 3);
 
-        if (!testPosition(dx, dz))
+        for(int i = 2; i > 0; i--)
         {
-            dx = round(dx, 2);
-            dz = round(dz, 2);
+            if (!testPosition(dx, dz))
+            {
+                dx = round(dx, i);
+                dz = round(dz, i);
+            }
         }
 
-        if (!testPosition(dx, dz))
-        {
-            dx = round(dx, 1);
-            dz = round(dz, 1);
-        }
-
-        if (!testPosition(dx, dz))
-        {
-            dx = round(dx, 0);
-            dz = round(dz, 0);
-        }
+        // Final test
         if (!testPosition(dx, dz) && cancelBad.get())
         {
             shouldCancel = true;
             return;
         }
-        if(lockYP.get())
+
+        if(syncYP.get())
         {
             mc.player.bodyYaw = mc.player.getYaw();
             mc.player.headYaw = mc.player.getYaw();
         }
         sendPosition(dx, mc.player.getPos().y, dz, mc.player.getVehicle() != null);
-        // MeteorClient.LOG.info(String.format("%f, %f, %f, %f", mc.player.prevX, mc.player.prevZ, mc.player.getX(), mc.player.getZ()));
-        // mc.player.prevX = mc.player.getX();
-        // mc.player.prevY = mc.player.getY();
-        // mc.player.prevZ = mc.player.getZ();
     }
 
     @EventHandler
@@ -142,19 +116,10 @@ public class LiveWalk extends Module
     {
         if ((event.packet instanceof PlayerMoveC2SPacket) && !packets.remove(event.packet)) event.cancel();
         if ((event.packet instanceof VehicleMoveC2SPacket) && vehicle.get() && !packetsVehicle.remove(event.packet)) event.cancel();
-
         if(shouldCancel)
         {
             event.cancel();
             shouldCancel = false;
-        }
-        if (onMoveOnly.get())
-        {
-            assert mc.player != null;
-            if (mc.player.input.movementForward == 0)
-            {
-                event.cancel();
-            }
         }
     }
 
@@ -164,8 +129,8 @@ public class LiveWalk extends Module
         if (event.packet instanceof PlayerPositionLookS2CPacket packet && spoofRotate.get())
         {
             assert mc.player != null;
-            // mc.player.setYaw(packet.getYaw());
-            // mc.player.setPitch(packet.getPitch());
+            ((PlayerPositionLookS2CPacketAccessor) event.packet).setPitch(mc.player.getPitch());
+            ((PlayerPositionLookS2CPacketAccessor) event.packet).setYaw(mc.player.getYaw());
         }
     }
 
@@ -177,17 +142,10 @@ public class LiveWalk extends Module
         {
             VehicleMoveC2SPacket packet = new VehicleMoveC2SPacket(mc.player);
             sendPacket(packet);
+            return;
         }
         sendPacket(new PlayerMoveC2SPacket.PositionAndOnGround(pos.x, pos.y, pos.z, mc.player.isOnGround()));
         mc.player.setPosition(pos);
-    }
-
-    private void sendVelocity(double x, double y, double z)
-    {
-        assert mc.player != null;
-        Vec3d pos = mc.player.getPos().add(x, y, z);
-        sendPacket(new PlayerMoveC2SPacket.PositionAndOnGround(pos.x, pos.y, pos.z, mc.player.isOnGround()));
-        mc.player.setPos(pos.x, pos.y, pos.z);
     }
 
     private void sendPacket(PlayerMoveC2SPacket packet)
@@ -197,8 +155,6 @@ public class LiveWalk extends Module
     }
     private void sendPacket(VehicleMoveC2SPacket packet)
     {
-        if(!vehicle.get())
-            return;
         packetsVehicle.add(packet);
         Objects.requireNonNull(mc.getNetworkHandler()).sendPacket(packet);
     }

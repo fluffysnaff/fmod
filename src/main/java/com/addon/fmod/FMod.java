@@ -39,7 +39,7 @@ public class FMod extends MeteorAddon {
 
     @Override
     public String getPackage() {
-        return "com.example.addon";
+        return "com.addon.fmod";
     }
 
     private void initModulesFMod()
