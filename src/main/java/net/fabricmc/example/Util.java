@@ -10,10 +10,11 @@ public class Util
 {
     public static final MinecraftClient CLIENT = MinecraftClient.getInstance();
     public static String commandPrefix = "^";
-
-    public static BigDecimal roundToDirection(BigDecimal val, int decimals)
+    public static double round(double val, int dec)
     {
-        return val.setScale(decimals, RoundingMode.FLOOR);
+        int decimals = (int)Math.pow(10, dec);
+        long subX = ((long)(val * decimals)) % 10;
+        return ((val * decimals) - subX) / decimals;
     }
 
     public static void log(String msg)

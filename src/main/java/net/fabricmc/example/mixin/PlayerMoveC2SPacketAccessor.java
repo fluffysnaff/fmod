@@ -31,6 +31,14 @@ public interface PlayerMoveC2SPacketAccessor {
     @Accessor("onGround")
     void setOnGround(boolean onGround);
 
+    @Mutable
+    @Accessor("changePosition")
+    void setChangePosition(boolean changePosition);
+
+    @Mutable
+    @Accessor("changeLook")
+    void setChangeLook(boolean changeLook);
+
     // Get
     @Accessor("x")
     double getX();

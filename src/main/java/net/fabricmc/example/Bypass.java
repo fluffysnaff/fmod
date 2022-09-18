@@ -1,108 +1,110 @@
 package net.fabricmc.example;
 
+import net.fabricmc.example.mixin.ClientPlayerEntityAccessor;
 import net.fabricmc.example.mixin.PlayerMoveC2SPacketAccessor;
 import net.fabricmc.example.mixin.VehicleMoveC2SPacketAccessor;
+import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.network.Packet;
 import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
 import net.minecraft.network.packet.c2s.play.VehicleMoveC2SPacket;
-
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import java.math.BigDecimal;
 
 public class Bypass
 {
     public static void MovementBypass(Packet<?> packet, CallbackInfo ci)
     {
-        if (!Vars.bypassLo)
-        {
+        if(!Vars.bypassLo)
             return;
-        }
-
         if (packet instanceof PlayerMoveC2SPacket movePacket)
         {
             var movePacketAccessor = (PlayerMoveC2SPacketAccessor) movePacket;
 
-            BigDecimal x = Util.roundToDirection(BigDecimal.valueOf(movePacketAccessor.getX()), 2);
-            BigDecimal z = Util.roundToDirection(BigDecimal.valueOf(movePacketAccessor.getZ()), 2);
+            double dx = movePacketAccessor.getX();
+            double dz = movePacketAccessor.getZ();
 
-            if ((x.longValue() * 1000) % 10 != 0 && (z.longValue() * 1000) % 10 != 0)
-            {
-                x = Util.roundToDirection(x, 1);
-                z = Util.roundToDirection(z, 1);
-            }
-            if ((x.longValue() * 1000) % 10 != 0 && (z.longValue() * 1000) % 10 != 0)
-            {
-                x = Util.roundToDirection(x, 0);
-                z = Util.roundToDirection(z, 0);
-            }
-            if ((x.longValue() * 1000) % 10 != 0 && (z.longValue() * 1000) % 10 != 0)
-            {
-                ci.cancel();
-                return;
-            }
-            movePacketAccessor.setX(x.doubleValue());
-            movePacketAccessor.setZ(z.doubleValue());
+            dx = Util.round(dx, 3);
+            dz = Util.round(dz, 3);
 
-            BigDecimal pitch = Util.roundToDirection(BigDecimal.valueOf(movePacketAccessor.getPitch()), 2);
-            BigDecimal yaw = Util.roundToDirection(BigDecimal.valueOf(movePacketAccessor.getYaw()), 2);
-            if ((pitch.longValue() * 1000) % 10 != 0 && (yaw.longValue() * 1000) % 10 != 0)
+            if ((((long) (dx * 1000)) % 10 != 0 && ((long) (dz * 1000)) % 10 != 0))
             {
-                pitch = Util.roundToDirection(pitch, 1);
-                yaw = Util.roundToDirection(yaw, 1);
-            }
-            FMod.LOGGER.info(String.format("1PY: %f, %f", pitch, yaw));
-            if ((pitch.longValue() * 1000) % 10 != 0 && (yaw.longValue() * 1000) % 10 != 0)
-            {
-                pitch = Util.roundToDirection(pitch, 0);
-                yaw = Util.roundToDirection(yaw, 0);
-            }
-            if ((pitch.longValue() * 1000) % 10 != 0 && (yaw.longValue() * 1000) % 10 != 0)
-            {
+                dx = Util.round(dx, 2);
+                dz = Util.round(dz, 2);
                 ci.cancel();
-                return;
             }
-            movePacketAccessor.setPitch(pitch.floatValue());
-            movePacketAccessor.setYaw(yaw.floatValue());
-            FMod.LOGGER.info(String.format("2PY: %f, %f", pitch, yaw));
+
+            if ((((long) (dx * 1000)) % 10 != 0 && ((long) (dz * 1000)) % 10 != 0))
+            {
+                dx = Util.round(dx, 1);
+                dz = Util.round(dz, 1);
+                ci.cancel();
+            }
+
+            if ((((long) (dx * 1000)) % 10 != 0 && ((long) (dz * 1000)) % 10 != 0))
+            {
+                dx = Util.round(dx, 0);
+                dz = Util.round(dz, 0);
+                ci.cancel();
+            }
+
+            // What does this do?
+            movePacketAccessor.setChangeLook(false);
+            movePacketAccessor.setChangePosition(false);
+
+            movePacketAccessor.setX(dx);
+            movePacketAccessor.setZ(dz);
+            FMod.LOGGER.info(String.format("X: %f, Z: %f | DX: %f, DZ: %f", movePacketAccessor.getX(), movePacketAccessor.getZ(), dx, dz));
         }
 
         if (packet instanceof VehicleMoveC2SPacket movePacket)
         {
-            var vehiclePacketAccessor = (VehicleMoveC2SPacketAccessor) movePacket;
+            var movePacketAccessor = (VehicleMoveC2SPacketAccessor) movePacket;
 
-            BigDecimal x = Util.roundToDirection(BigDecimal.valueOf(vehiclePacketAccessor.getX()), 2);
-            BigDecimal z = Util.roundToDirection(BigDecimal.valueOf(vehiclePacketAccessor.getZ()), 2);
+            double dx = movePacketAccessor.getX();
+            double dz = movePacketAccessor.getZ();
 
-            if ((x.longValue() * 1000) % 10 != 0 && (z.longValue() * 1000) % 10 != 0)
+            dx = Util.round(dx, 3);
+            dz = Util.round(dz, 3);
+
+            if ((((long) (dx * 1000)) % 10 != 0 && ((long) (dz * 1000)) % 10 != 0))
             {
-                x = Util.roundToDirection(x, 1);
-                z = Util.roundToDirection(z, 1);
+                dx = Util.round(dx, 2);
+                dz = Util.round(dz, 2);
+                ci.cancel();
             }
 
-            if ((x.longValue() * 1000) % 10 != 0 && (z.longValue() * 1000) % 10 != 0)
+            if ((((long) (dx * 1000)) % 10 != 0 && ((long) (dz * 1000)) % 10 != 0))
             {
-                x = Util.roundToDirection(x, 0);
-                z = Util.roundToDirection(z, 0);
-            }
-            vehiclePacketAccessor.setX(x.doubleValue());
-            vehiclePacketAccessor.setZ(z.doubleValue());
-
-            BigDecimal pitch = Util.roundToDirection(BigDecimal.valueOf(vehiclePacketAccessor.getPitch()), 2);
-            BigDecimal yaw = Util.roundToDirection(BigDecimal.valueOf(vehiclePacketAccessor.getYaw()), 2);
-            if ((pitch.longValue() * 1000) % 10 != 0 && (yaw.longValue() * 1000) % 10 != 0)
-            {
-                pitch = Util.roundToDirection(pitch, 1);
-                yaw = Util.roundToDirection(yaw, 1);
+                dx = Util.round(dx, 1);
+                dz = Util.round(dz, 1);
+                ci.cancel();
             }
 
-            if ((pitch.longValue() * 1000) % 10 != 0 &&  (yaw.longValue() * 1000) % 10 != 0)
+            if ((((long) (dx * 1000)) % 10 != 0 && ((long) (dz * 1000)) % 10 != 0))
             {
-                pitch = Util.roundToDirection(pitch, 0);
-                yaw = Util.roundToDirection(yaw, 0);
+                dx = Util.round(dx, 0);
+                dz = Util.round(dz, 0);
+                ci.cancel();
             }
-            vehiclePacketAccessor.setPitch(pitch.floatValue());
-            vehiclePacketAccessor.setYaw(yaw.floatValue());
-            FMod.LOGGER.info(String.format("XZPY: %f, %f, %f, %f", x, z, pitch, yaw));
+
+            movePacketAccessor.setX(dx);
+            movePacketAccessor.setZ(dz);
+            FMod.LOGGER.info(String.format("X: %f, Z: %f | DX: %f, DZ: %f", movePacketAccessor.getX(), movePacketAccessor.getZ(), dx, dz));
+        }
+    }
+
+    public static void WGBypass(Packet<?> packet, CallbackInfo ci)
+    {
+        if(!Vars.bypassWg)
+            return;
+        if (packet instanceof ClientPlayerEntity movePacket)
+        {
+            var packetAccessor = (ClientPlayerEntityAccessor) movePacket;
+            assert Util.CLIENT.player != null;
+            packetAccessor.setLastX(Util.CLIENT.player.getX());
+            packetAccessor.setLastBaseY(Util.CLIENT.player.getY());
+            packetAccessor.setLastZ(Util.CLIENT.player.getZ());
+            packetAccessor.setLastPitch(Util.CLIENT.player.getPitch());
+            packetAccessor.setLastYaw(Util.CLIENT.player.getYaw());
         }
     }
 }

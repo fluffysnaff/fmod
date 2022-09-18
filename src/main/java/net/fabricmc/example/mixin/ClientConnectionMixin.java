@@ -2,12 +2,9 @@ package net.fabricmc.example.mixin;
 
 import net.fabricmc.example.Bypass;
 
-import net.fabricmc.example.Util;
-import net.fabricmc.example.Vars;
 import net.minecraft.network.ClientConnection;
 import net.minecraft.network.Packet;
 
-import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -22,5 +19,6 @@ public class ClientConnectionMixin
     public void send(Packet<?> packet, CallbackInfo ci)
     {
         Bypass.MovementBypass(packet, ci);
+        Bypass.WGBypass(packet, ci);
     }
 }
