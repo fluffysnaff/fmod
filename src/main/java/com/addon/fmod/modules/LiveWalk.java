@@ -140,9 +140,9 @@ public class LiveWalk extends Module
         assert mc.player != null;
         if(v && vehicle.get())
         {
+            mc.player.setPosition(pos);
             VehicleMoveC2SPacket packet = new VehicleMoveC2SPacket(mc.player);
             sendPacket(packet);
-            return;
         }
         sendPacket(new PlayerMoveC2SPacket.Full(pos.x, pos.y, pos.z, mc.player.getYaw(), mc.player.getPitch(), mc.player.isOnGround()));
         mc.player.setPosition(pos);
