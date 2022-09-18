@@ -22,15 +22,8 @@ public class LiveWalk extends Module
 
     private final SettingGroup sgGeneral = settings.getDefaultGroup();
 
-    private final Setting<Boolean> spoofRotate = sgGeneral.add(new BoolSetting.Builder()
-        .name("spoof-rotate")
-        .description("Spoofs your rotation.")
-        .defaultValue(true)
-        .build()
-    );
-
     private final Setting<Boolean> cancelBad = sgGeneral.add(new BoolSetting.Builder()
-        .name("cancel-bad")
+        .name("cancel-bad-packets")
         .description("Cancels bad position packets.")
         .defaultValue(true)
         .build()
@@ -38,7 +31,14 @@ public class LiveWalk extends Module
 
     private final Setting<Boolean> vehicle = sgGeneral.add(new BoolSetting.Builder()
         .name("vehicle")
-        .description("Enable vehicle bypass")
+        .description("Enable vehicle bypass.")
+        .defaultValue(true)
+        .build()
+    );
+
+    private final Setting<Boolean> spoofRotate = sgGeneral.add(new BoolSetting.Builder()
+        .name("spoof-rotate")
+        .description("Spoofs your rotation.")
         .defaultValue(true)
         .build()
     );
