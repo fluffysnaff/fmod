@@ -9,6 +9,7 @@ import meteordevelopment.meteorclient.settings.Setting;
 import meteordevelopment.meteorclient.settings.SettingGroup;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.orbit.EventHandler;
+import net.minecraft.entity.Entity;
 import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
 import net.minecraft.network.packet.c2s.play.VehicleMoveC2SPacket;
 import net.minecraft.network.packet.s2c.play.PlayerPositionLookS2CPacket;
@@ -36,13 +37,6 @@ public class LiveWalk extends Module
         .build()
     );
 
-    private final Setting<Boolean> spoofRotate = sgGeneral.add(new BoolSetting.Builder()
-        .name("spoof-rotate")
-        .description("Spoofs your rotation.")
-        .defaultValue(true)
-        .build()
-    );
-
     private final Setting<Boolean> syncYP = sgGeneral.add(new BoolSetting.Builder()
         .name("sync-yaw-pitch")
         .description("Synchronizes base yaw and base pitch with yaw and pitch.")
@@ -58,6 +52,7 @@ public class LiveWalk extends Module
     private final HashSet<PlayerMoveC2SPacket> packets = new HashSet<>();
     private final HashSet<VehicleMoveC2SPacket> packetsVehicle = new HashSet<>();
     private boolean shouldCancel = false;
+    private Entity vehicleEntity = null;
 
     private double round(double val, int dec)
     {
@@ -77,10 +72,13 @@ public class LiveWalk extends Module
         assert mc.player != null;
         double dx = mc.player.getPos().x;
         double dz = mc.player.getPos().z;
+        double y = mc.player.getPos().y;
         if(mc.player.getVehicle() != null && vehicle.get())
         {
+            vehicleEntity = mc.player.getVehicle();
             dx = mc.player.getVehicle().getX();
             dz = mc.player.getVehicle().getZ();
+            y = mc.player.getVehicle().getY();
         }
 
         // First round the thousandths
@@ -108,7 +106,7 @@ public class LiveWalk extends Module
             mc.player.bodyYaw = mc.player.getYaw();
             mc.player.headYaw = mc.player.getYaw();
         }
-        sendPosition(dx, mc.player.getPos().y, dz, mc.player.getVehicle() != null);
+        sendPosition(dx, y, dz, mc.player.getVehicle() != null);
     }
 
     @EventHandler
@@ -123,25 +121,14 @@ public class LiveWalk extends Module
         }
     }
 
-    @EventHandler
-    public void onPacketReceive(PacketEvent.Receive event)
-    {
-        if (event.packet instanceof PlayerPositionLookS2CPacket packet && spoofRotate.get())
-        {
-            assert mc.player != null;
-            ((PlayerPositionLookS2CPacketAccessor) event.packet).setPitch(mc.player.getPitch());
-            ((PlayerPositionLookS2CPacketAccessor) event.packet).setYaw(mc.player.getYaw());
-        }
-    }
-
     private void sendPosition(double x, double y, double z, boolean v)
     {
         Vec3d pos = new Vec3d(x, y, z);
         assert mc.player != null;
         if(v && vehicle.get())
         {
-            mc.player.setPosition(pos);
-            VehicleMoveC2SPacket packet = new VehicleMoveC2SPacket(mc.player);
+            vehicleEntity.setPos(pos.x, pos.y, pos.z);
+            VehicleMoveC2SPacket packet = new VehicleMoveC2SPacket(vehicleEntity);
             sendPacket(packet);
             return;
         }
