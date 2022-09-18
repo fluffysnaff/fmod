@@ -1,38 +1,31 @@
 {
   "schemaVersion": 1,
-  "id": "modid",
+  "id": "fmod",
   "version": "${version}",
-
   "name": "FMod",
-  "description": "Best mod ever",
+  "description": "The mod",
   "authors": [
-    "Me!"
+    "me"
   ],
   "contact": {
-    "homepage": "https://fabricmc.net/",
-    "sources": "https://gitlab.com/fluffysnaff/fmod"
+    "repo": "https://gitlab.com/fluffysnaff/fmod"
   },
-
-  "license": "CC0-1.0",
-  "icon": "assets/modid/icon.png",
-
-  "environment": "*",
+  "icon": "assets/template/icon.png",
+  "environment": "client",
   "entrypoints": {
-    "main": [
-      "net.fabricmc.example.FMod"
+    "meteor": [
+      "com.addon.fmod.FMod"
     ]
   },
   "mixins": [
-    "modid.mixins.json"
+    "fmod.mixins.json"
   ],
-
-  "depends": {
-    "fabricloader": ">=0.14.9",
-    "fabric-api": "*",
-    "minecraft": "~1.19",
-    "java": ">=17"
+  "custom": {
+    "meteor-client:color": "90,150,170"
   },
-  "suggests": {
-    "another-mod": "*"
+  "depends": {
+    "java": ">=17",
+    "minecraft": ">=${mc_version}",
+    "meteor-client": "*"
   }
 }

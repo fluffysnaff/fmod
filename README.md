@@ -1,9 +1,8 @@
-# Fabric Example Mod
+# Meteor Addon Template
 
-## Setup
+A template to allow easy usage of the Meteor Addon API.
 
-For setup instructions please see the [fabric wiki page](https://fabricmc.net/wiki/tutorial:setup) that relates to the IDE that you are using.
-
-## License
-
-This template is available under the CC0 license. Feel free to learn from it and incorporate it in your own projects.
+### How to use:  
+- Clone this project
+- Use this template to create new modules/commands
+- Run the mod with Meteor.
