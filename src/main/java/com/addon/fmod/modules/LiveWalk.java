@@ -144,7 +144,7 @@ public class LiveWalk extends Module
             sendPacket(packet);
             return;
         }
-        sendPacket(new PlayerMoveC2SPacket.PositionAndOnGround(pos.x, pos.y, pos.z, mc.player.isOnGround()));
+        sendPacket(new PlayerMoveC2SPacket.Full(pos.x, pos.y, pos.z, mc.player.getYaw(), mc.player.getPitch(), mc.player.isOnGround()));
         mc.player.setPosition(pos);
     }
 
