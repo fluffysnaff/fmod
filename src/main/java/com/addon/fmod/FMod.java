@@ -1,6 +1,6 @@
 package com.addon.fmod;
 
-import com.addon.fmod.commands.CommandExample;
+//import com.addon.fmod.commands.CommandExample;
 import com.addon.fmod.hud.HudExample;
 import com.addon.fmod.modules.LiveWalk;
 import com.mojang.logging.LogUtils;
@@ -26,7 +26,7 @@ public class FMod extends MeteorAddon {
         initModulesFMod();
 
         // Commands
-        Commands.get().add(new CommandExample());
+        // Commands.get().add(new CommandExample());
 
         // HUD
         Hud.get().register(HudExample.INFO);
