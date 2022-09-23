@@ -54,13 +54,6 @@ public class LiveWalk extends Module
     private boolean shouldCancel = false;
     private Entity vehicleEntity = null;
 
-    private double round(double val, int dec)
-    {
-        int decimals = (int)Math.pow(10, dec);
-        long subX = ((long)(val * decimals)) % 10;
-        return ((val * decimals) - subX) / decimals;
-    }
-
     private boolean testPosition(double x, double z)
     {
         return ((long) (x * 1000)) % 10 == 0 || ((long) (z * 1000)) % 10 == 0;
@@ -82,15 +75,15 @@ public class LiveWalk extends Module
         }
 
         // First round the thousandths
-        dx = round(dx, 3);
-        dz = round(dz, 3);
+        dx = FMod.round(dx, 3);
+        dz = FMod.round(dz, 3);
 
         for(int i = 2; i > 0; i--)
         {
             if (!testPosition(dx, dz))
             {
-                dx = round(dx, i);
-                dz = round(dz, i);
+                dx = FMod.round(dx, i);
+                dz = FMod.round(dz, i);
             }
         }
 

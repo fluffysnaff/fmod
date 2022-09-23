@@ -2,6 +2,7 @@ package com.addon.fmod;
 
 //import com.addon.fmod.commands.CommandExample;
 import com.addon.fmod.hud.HudExample;
+import com.addon.fmod.modules.FrozenWalk;
 import com.addon.fmod.modules.LiveWalk;
 import com.mojang.logging.LogUtils;
 import meteordevelopment.meteorclient.addons.MeteorAddon;
@@ -17,6 +18,13 @@ public class FMod extends MeteorAddon {
     public static final Logger LOG = LogUtils.getLogger();
     public static final Category CATEGORY = new Category("FMod", Items.DAMAGED_ANVIL.getDefaultStack());
     public static final HudGroup HUD_GROUP = new HudGroup("FMod");
+
+    public static double round(double val, int dec)
+    {
+        int decimals = (int)Math.pow(10, dec);
+        long subX = ((long)(val * decimals)) % 10;
+        return ((val * decimals) - subX) / decimals;
+    }
 
     @Override
     public void onInitialize() {
@@ -45,5 +53,6 @@ public class FMod extends MeteorAddon {
     private void initModulesFMod()
     {
         Modules.get().add(new LiveWalk());
+        Modules.get().add(new FrozenWalk());
     }
 }
