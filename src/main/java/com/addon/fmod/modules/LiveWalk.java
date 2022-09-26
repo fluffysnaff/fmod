@@ -3,7 +3,6 @@ package com.addon.fmod.modules;
 import com.addon.fmod.FMod;
 import meteordevelopment.meteorclient.events.entity.player.SendMovementPacketsEvent;
 import meteordevelopment.meteorclient.events.packets.PacketEvent;
-import meteordevelopment.meteorclient.mixin.PlayerPositionLookS2CPacketAccessor;
 import meteordevelopment.meteorclient.settings.BoolSetting;
 import meteordevelopment.meteorclient.settings.Setting;
 import meteordevelopment.meteorclient.settings.SettingGroup;
@@ -12,7 +11,6 @@ import meteordevelopment.orbit.EventHandler;
 import net.minecraft.entity.Entity;
 import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
 import net.minecraft.network.packet.c2s.play.VehicleMoveC2SPacket;
-import net.minecraft.network.packet.s2c.play.PlayerPositionLookS2CPacket;
 import net.minecraft.util.math.Vec3d;
 
 import java.util.HashSet;
@@ -22,14 +20,6 @@ public class LiveWalk extends Module
 {
 
     private final SettingGroup sgGeneral = settings.getDefaultGroup();
-
-    private final Setting<Boolean> cancelBad = sgGeneral.add(new BoolSetting.Builder()
-        .name("cancel-bad-packets")
-        .description("Cancels bad position packets.")
-        .defaultValue(true)
-        .build()
-    );
-
     private final Setting<Boolean> vehicle = sgGeneral.add(new BoolSetting.Builder()
         .name("vehicle")
         .description("Enable vehicle bypass.")
@@ -37,9 +27,9 @@ public class LiveWalk extends Module
         .build()
     );
 
-    private final Setting<Boolean> syncYP = sgGeneral.add(new BoolSetting.Builder()
-        .name("sync-yaw-pitch")
-        .description("Synchronizes base yaw and base pitch with yaw and pitch.")
+    private final Setting<Boolean> lockYaw = sgGeneral.add(new BoolSetting.Builder()
+        .name("lock-yaw")
+        .description("Locks yaw & head yaw")
         .defaultValue(false)
         .build()
     );
@@ -51,12 +41,11 @@ public class LiveWalk extends Module
 
     private final HashSet<PlayerMoveC2SPacket> packets = new HashSet<>();
     private final HashSet<VehicleMoveC2SPacket> packetsVehicle = new HashSet<>();
-    private boolean shouldCancel = false;
     private Entity vehicleEntity = null;
 
-    private boolean testPosition(double x, double z)
+    private boolean isBadPosition(double x, double z)
     {
-        return ((long) (x * 1000)) % 10 == 0 || ((long) (z * 1000)) % 10 == 0;
+        return ((long) (x * 1000)) % 10 != 0 && ((long) (z * 1000)) % 10 != 0;
     }
 
     @EventHandler
@@ -74,13 +63,13 @@ public class LiveWalk extends Module
             y = mc.player.getVehicle().getY();
         }
 
-        // First round the thousandths
+        // First round to the thousandths
         dx = FMod.round(dx, 3);
         dz = FMod.round(dz, 3);
 
         for(int i = 2; i > 0; i--)
         {
-            if (!testPosition(dx, dz))
+            if (isBadPosition(dx, dz))
             {
                 dx = FMod.round(dx, i);
                 dz = FMod.round(dz, i);
@@ -88,17 +77,9 @@ public class LiveWalk extends Module
         }
 
         // Final test
-        if (!testPosition(dx, dz) && cancelBad.get())
-        {
-            shouldCancel = true;
+        if (isBadPosition(dx, dz))
             return;
-        }
 
-        if(syncYP.get())
-        {
-            mc.player.bodyYaw = mc.player.getYaw();
-            mc.player.headYaw = mc.player.getYaw();
-        }
         sendPosition(dx, y, dz, mc.player.getVehicle() != null);
     }
 
@@ -107,26 +88,26 @@ public class LiveWalk extends Module
     {
         if ((event.packet instanceof PlayerMoveC2SPacket) && !packets.remove(event.packet)) event.cancel();
         if ((event.packet instanceof VehicleMoveC2SPacket) && vehicle.get() && !packetsVehicle.remove(event.packet)) event.cancel();
-        if(shouldCancel)
-        {
-            event.cancel();
-            shouldCancel = false;
-        }
     }
 
     private void sendPosition(double x, double y, double z, boolean v)
     {
-        Vec3d pos = new Vec3d(x, y, z);
         assert mc.player != null;
+        float yaw = mc.player.getYaw();
+        if(lockYaw.get())
+        {
+            mc.player.bodyYaw = 0.f;
+            mc.player.headYaw = 0.f;
+        }
         if(v && vehicle.get())
         {
-            vehicleEntity.setPos(pos.x, pos.y, pos.z);
+            vehicleEntity.setPos(x, y, z);
             VehicleMoveC2SPacket packet = new VehicleMoveC2SPacket(vehicleEntity);
             sendPacket(packet);
             return;
         }
-        sendPacket(new PlayerMoveC2SPacket.Full(pos.x, pos.y, pos.z, mc.player.getYaw(), mc.player.getPitch(), mc.player.isOnGround()));
-        mc.player.setPosition(pos);
+        sendPacket(new PlayerMoveC2SPacket.Full(x, y, z, yaw, mc.player.getPitch(), mc.player.isOnGround()));
+        mc.player.setPos(x, y, z);
     }
 
     private void sendPacket(PlayerMoveC2SPacket packet)
