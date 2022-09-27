@@ -4,15 +4,17 @@ import com.addon.fmod.FMod;
 import meteordevelopment.meteorclient.events.entity.player.SendMovementPacketsEvent;
 import meteordevelopment.meteorclient.events.packets.PacketEvent;
 import meteordevelopment.meteorclient.events.world.TickEvent;
-import meteordevelopment.meteorclient.mixin.PlayerPositionLookS2CPacketAccessor;
+import com.addon.fmod.mixin.PlayerPositionLookS2CPacketAccessor;
 import meteordevelopment.meteorclient.settings.BoolSetting;
 import meteordevelopment.meteorclient.settings.Setting;
 import meteordevelopment.meteorclient.settings.SettingGroup;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.orbit.EventHandler;
+import net.fabricmc.loader.impl.lib.sat4j.core.Vec;
 import net.minecraft.entity.Entity;
 import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
 import net.minecraft.network.packet.c2s.play.VehicleMoveC2SPacket;
+import net.minecraft.network.packet.s2c.play.EntityS2CPacket;
 import net.minecraft.network.packet.s2c.play.PlayerPositionLookS2CPacket;
 import net.minecraft.util.math.Vec3d;
 
@@ -31,7 +33,7 @@ public class FrozenWalk extends Module
     private final Setting<Boolean> antiFlyKick = sgGeneral.add(new BoolSetting.Builder()
         .name("anti-fly-kick")
         .description("Stops you from getting kicked when flying")
-        .defaultValue(false)
+        .defaultValue(true)
         .build()
     );
     private int timer = 0;
@@ -52,18 +54,17 @@ public class FrozenWalk extends Module
             event.cancel();
         if(event.packet instanceof PlayerMoveC2SPacket.LookAndOnGround)
             event.cancel();
-
     }
 
     @EventHandler
     public void onRecievePacket(PacketEvent.Receive event) {
-        if (event.packet instanceof PlayerPositionLookS2CPacket) {
+        if (event.packet instanceof PlayerPositionLookS2CPacket)
+        {
             PlayerPositionLookS2CPacketAccessor p = (PlayerPositionLookS2CPacketAccessor) event.packet;
 
             p.setPitch(mc.player.getPitch());
             p.setYaw(mc.player.getYaw());
         }
-
     }
     private boolean testPosition(double x, double z)
     {
@@ -76,13 +77,12 @@ public class FrozenWalk extends Module
         if (!mc.player.isAlive())
             return;
 
-        double hspeed = 0.03;
-        double vspeed = 0.03;
+        double hspeed = 0.03130D;
+        double vspeed = 0.03130D;
         timer++;
 
         Vec3d forward = new Vec3d(0, 0, hspeed).rotateY(-(float) Math.toRadians(Math.round(mc.player.getYaw() / 90) * 90));
         Vec3d moveVec = Vec3d.ZERO;
-        //wtf
         if (mc.player.input.pressingForward) {
             if (!mc.player.input.pressingBack){
                 moveVec = moveVec.add(forward);
@@ -103,10 +103,6 @@ public class FrozenWalk extends Module
             moveVec = moveVec.add(forward.rotateY((float) -Math.toRadians(90)));
         }
 
-        // if (timer > 1) {
-        //     moveVec = new Vec3d(0, -vspeed, 0);
-        //     timer = 0;
-        // }
         if(timer > 1) {
             moveVec.add(0, -2 * vspeed, 0);
             timer = 0;
