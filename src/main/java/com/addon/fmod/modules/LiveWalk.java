@@ -11,7 +11,6 @@ import meteordevelopment.orbit.EventHandler;
 import net.minecraft.entity.Entity;
 import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
 import net.minecraft.network.packet.c2s.play.VehicleMoveC2SPacket;
-import net.minecraft.util.math.Vec3d;
 
 import java.util.HashSet;
 import java.util.Objects;
@@ -43,11 +42,6 @@ public class LiveWalk extends Module
     private final HashSet<VehicleMoveC2SPacket> packetsVehicle = new HashSet<>();
     private Entity vehicleEntity = null;
 
-    private boolean isBadPosition(double x, double z)
-    {
-        return ((long) (x * 1000)) % 10 != 0 && ((long) (z * 1000)) % 10 != 0;
-    }
-
     @EventHandler
     public void onSendMovementPackets(SendMovementPacketsEvent.Pre event)
     {
@@ -69,7 +63,7 @@ public class LiveWalk extends Module
 
         for(int i = 2; i > 0; i--)
         {
-            if (isBadPosition(dx, dz))
+            if (FMod.isNotRoundedPos(dx, dz))
             {
                 dx = FMod.round(dx, i);
                 dz = FMod.round(dz, i);
@@ -77,7 +71,7 @@ public class LiveWalk extends Module
         }
 
         // Final test
-        if (isBadPosition(dx, dz))
+        if (FMod.isNotRoundedPos(dx, dz))
             return;
 
         sendPosition(dx, y, dz, mc.player.getVehicle() != null);
@@ -93,12 +87,6 @@ public class LiveWalk extends Module
     private void sendPosition(double x, double y, double z, boolean v)
     {
         assert mc.player != null;
-        float yaw = mc.player.getYaw();
-        if(lockYaw.get())
-        {
-            mc.player.bodyYaw = 0.f;
-            mc.player.headYaw = 0.f;
-        }
         if(v && vehicle.get())
         {
             vehicleEntity.setPos(x, y, z);
@@ -106,7 +94,7 @@ public class LiveWalk extends Module
             sendPacket(packet);
             return;
         }
-        sendPacket(new PlayerMoveC2SPacket.Full(x, y, z, yaw, mc.player.getPitch(), mc.player.isOnGround()));
+        sendPacket(new PlayerMoveC2SPacket.PositionAndOnGround(x, y, z, mc.player.isOnGround()));
         mc.player.setPos(x, y, z);
     }
 
