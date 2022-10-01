@@ -79,42 +79,25 @@ public class FrozenWalk extends Module
         double horSpeed = 1.0 / 256.0;
         double verSpeed = 1.0 / 256.0;
 
-        Vec3d forward = new Vec3d(0, 0, horSpeed).rotateY(-(float) Math.toRadians(Math.round(mc.player.getYaw() / 90) * 90));
+        // https://github.com/Akarin-project/Akarin/blob/ver/1.12.2/sources/src/main/java/net/minecraft/server/PlayerConnection.java#L431
+        double mySpeed = 1.0 / 256.0;
+        double x = mc.player.getVelocity().x;
+        double z = mc.player.getVelocity().z;
+        double n = Math.sqrt((mySpeed * mySpeed) / (x*x + z*z + 1));
+        x *= n;
+        z *= n;
+
         Vec3d moveVec = Vec3d.ZERO;
-        if (mc.player.input.pressingForward)
+
+        if (mc.player.input.jumping)
         {
-            if (!mc.player.input.pressingBack)
-            {
-                moveVec = moveVec.add(forward);
-            }
-        }
-        else if (mc.player.input.pressingBack)
-        {
-            moveVec = moveVec.add(forward.negate());
-        }
-        else if (mc.player.input.jumping)
-        {
-            if (!mc.player.input.sneaking)
-            {
-                moveVec = moveVec.add(0, verSpeed, 0);
-            }
+            moveVec = moveVec.add(0, verSpeed, 0);
         }
         else if (mc.player.input.sneaking)
         {
             moveVec = moveVec.add(0, -verSpeed, 0);
         }
-        else if (mc.player.input.pressingLeft)
-        {
-            if (!mc.player.input.pressingRight)
-            {
-                moveVec = moveVec.add(forward.rotateY((float) Math.toRadians(90)));
-            }
-        }
-        else if (mc.player.input.pressingRight)
-        {
-            moveVec = moveVec.add(forward.rotateY((float) -Math.toRadians(90)));
-        }
-
+        moveVec = moveVec.add(x, 0, z);
         Vec3d newX = new Vec3d(mc.player.getX() + moveVec.x, mc.player.getY(), mc.player.getZ() + moveVec.z);
         mc.player.setPosition(newX);
 
