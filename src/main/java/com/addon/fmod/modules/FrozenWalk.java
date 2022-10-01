@@ -76,33 +76,29 @@ public class FrozenWalk extends Module
         if (!mc.player.isAlive())
             return;
 
-        double horSpeed = 1.0 / 256.0;
-        double verSpeed = 1.0 / 256.0;
-
         // https://github.com/Akarin-project/Akarin/blob/ver/1.12.2/sources/src/main/java/net/minecraft/server/PlayerConnection.java#L431
+        Vec3d moveVec = Vec3d.ZERO;
         double mySpeed = 1.0 / 256.0;
+
         double x = mc.player.getVelocity().x;
         double z = mc.player.getVelocity().z;
-        double n = Math.sqrt((mySpeed * mySpeed) / (x*x + z*z + 1));
-        x *= n;
-        z *= n;
+        double den = (x*x + z*z) != 0 ? (x*x + z*z) : 1;
+        double n = Math.sqrt((mySpeed * mySpeed) / den);
 
-        Vec3d moveVec = Vec3d.ZERO;
-
+        moveVec = moveVec.add(x * n, 0, z * n);
         if (mc.player.input.jumping)
         {
-            moveVec = moveVec.add(0, verSpeed, 0);
+            moveVec = moveVec.add(0, mySpeed, 0);
         }
         else if (mc.player.input.sneaking)
         {
-            moveVec = moveVec.add(0, -verSpeed, 0);
+            moveVec = moveVec.add(0, -mySpeed, 0);
         }
-        moveVec = moveVec.add(x, 0, z);
-        Vec3d newX = new Vec3d(mc.player.getX() + moveVec.x, mc.player.getY(), mc.player.getZ() + moveVec.z);
-        mc.player.setPosition(newX);
+        Vec3d newPos = new Vec3d(mc.player.getX() + moveVec.x, mc.player.getY(), mc.player.getZ() + moveVec.z);
+        mc.player.setPosition(newPos);
 
-        sendPosition(newX.x, newX.y + moveVec.y, newX.z, false);
-        sendPosition(newX.x, newX.y - 500, newX.z, true);
+        sendPosition(newPos.x, newPos.y + moveVec.y, newPos.z, false);
+        sendPosition(newPos.x, newPos.y - 500, newPos.z, true);
     }
 
     private void sendPosition(double x, double y, double z, boolean isOnGround)
