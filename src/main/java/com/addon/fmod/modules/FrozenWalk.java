@@ -32,7 +32,12 @@ public class FrozenWalk extends Module
         .defaultValue(true)
         .build()
     );
-    private int timer = 0;
+    private final Setting<Boolean> noRotate = sgGeneral.add(new BoolSetting.Builder()
+        .name("no-rotate")
+        .description("Stops sending/receiving pitch/yaw")
+        .defaultValue(true)
+        .build()
+    );
     private final HashSet<PlayerMoveC2SPacket> packets = new HashSet<>();
 
     @EventHandler
@@ -56,10 +61,9 @@ public class FrozenWalk extends Module
     @EventHandler
     public void onRecievePacket(PacketEvent.Receive event)
     {
-        if (event.packet instanceof PlayerPositionLookS2CPacket)
+        if (event.packet instanceof PlayerPositionLookS2CPacket && noRotate.get())
         {
             PlayerPositionLookS2CPacketAccessor p = (PlayerPositionLookS2CPacketAccessor) event.packet;
-
             assert mc.player != null;
             p.setPitch(mc.player.getPitch());
             p.setYaw(mc.player.getYaw());
@@ -74,7 +78,6 @@ public class FrozenWalk extends Module
 
         double horSpeed = 1.0 / 256.0;
         double verSpeed = 1.0 / 256.0;
-        timer++;
 
         Vec3d forward = new Vec3d(0, 0, horSpeed).rotateY(-(float) Math.toRadians(Math.round(mc.player.getYaw() / 90) * 90));
         Vec3d moveVec = Vec3d.ZERO;
@@ -110,12 +113,6 @@ public class FrozenWalk extends Module
         else if (mc.player.input.pressingRight)
         {
             moveVec = moveVec.add(forward.rotateY((float) -Math.toRadians(90)));
-        }
-
-        if(timer > 10)
-        {
-            moveVec.add(0, -2 * verSpeed, 0);
-            timer = 0;
         }
 
         Vec3d newX = new Vec3d(mc.player.getX() + moveVec.x, mc.player.getY(), mc.player.getZ() + moveVec.z);

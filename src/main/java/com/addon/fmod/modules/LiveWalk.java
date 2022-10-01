@@ -1,6 +1,7 @@
 package com.addon.fmod.modules;
 
 import com.addon.fmod.FMod;
+import com.addon.fmod.mixin.PlayerPositionLookS2CPacketAccessor;
 import meteordevelopment.meteorclient.events.entity.player.SendMovementPacketsEvent;
 import meteordevelopment.meteorclient.events.packets.PacketEvent;
 import meteordevelopment.meteorclient.settings.BoolSetting;
@@ -11,6 +12,7 @@ import meteordevelopment.orbit.EventHandler;
 import net.minecraft.entity.Entity;
 import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
 import net.minecraft.network.packet.c2s.play.VehicleMoveC2SPacket;
+import net.minecraft.network.packet.s2c.play.PlayerPositionLookS2CPacket;
 
 import java.util.HashSet;
 import java.util.Objects;
@@ -25,11 +27,10 @@ public class LiveWalk extends Module
         .defaultValue(true)
         .build()
     );
-
-    private final Setting<Boolean> lockYaw = sgGeneral.add(new BoolSetting.Builder()
-        .name("lock-yaw")
-        .description("Locks yaw & head yaw")
-        .defaultValue(false)
+    private final Setting<Boolean> noRotate = sgGeneral.add(new BoolSetting.Builder()
+        .name("no-rotate")
+        .description("Stops sending/receiving pitch/yaw")
+        .defaultValue(true)
         .build()
     );
 
@@ -82,6 +83,18 @@ public class LiveWalk extends Module
     {
         if ((event.packet instanceof PlayerMoveC2SPacket) && !packets.remove(event.packet)) event.cancel();
         if ((event.packet instanceof VehicleMoveC2SPacket) && vehicle.get() && !packetsVehicle.remove(event.packet)) event.cancel();
+    }
+
+    @EventHandler
+    public void onRecievePacket(PacketEvent.Receive event)
+    {
+        if (event.packet instanceof PlayerPositionLookS2CPacket && noRotate.get())
+        {
+            PlayerPositionLookS2CPacketAccessor p = (PlayerPositionLookS2CPacketAccessor) event.packet;
+            assert mc.player != null;
+            p.setPitch(mc.player.getPitch());
+            p.setYaw(mc.player.getYaw());
+        }
     }
 
     private void sendPosition(double x, double y, double z, boolean v)
