@@ -9,8 +9,12 @@ import meteordevelopment.meteorclient.settings.BoolSetting;
 import meteordevelopment.meteorclient.settings.Setting;
 import meteordevelopment.meteorclient.settings.SettingGroup;
 import meteordevelopment.meteorclient.systems.modules.Module;
+import meteordevelopment.meteorclient.utils.misc.Vec3;
 import meteordevelopment.orbit.EventHandler;
+import net.fabricmc.loader.impl.lib.sat4j.core.Vec;
 import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
+import net.minecraft.network.packet.s2c.play.EntityPositionS2CPacket;
+import net.minecraft.network.packet.s2c.play.EntityS2CPacket;
 import net.minecraft.network.packet.s2c.play.PlayerPositionLookS2CPacket;
 import net.minecraft.util.math.Vec3d;
 
@@ -38,14 +42,26 @@ public class FrozenWalk extends Module
         .defaultValue(true)
         .build()
     );
+
+    public final Setting<Boolean> strict = sgGeneral.add(new BoolSetting.Builder()
+        .name("strict")
+        .description("Strict mode, uses low speed")
+        .defaultValue(true)
+        .build()
+    );
     private final HashSet<PlayerMoveC2SPacket> packets = new HashSet<>();
+
+    public static boolean inSameBlock(Vec3d vector, Vec3d other) {
+        return other.x >= Math.floor(vector.x) && other.x <= Math.ceil(vector.x) &&
+            other.y >= Math.floor(vector.y) && other.y <= Math.ceil(vector.y) &&
+            other.z >= Math.floor(vector.z) && other.z <= Math.ceil(vector.z);
+    }
 
     @EventHandler
     public void onSendMovementPackets(SendMovementPacketsEvent.Pre event)
     {
         assert mc.player != null;
         mc.player.setVelocity(Vec3d.ZERO);
-
     }
 
     @EventHandler
@@ -70,43 +86,59 @@ public class FrozenWalk extends Module
         }
     }
 
+    // https://github.com/Akarin-project/Akarin/blob/ver/1.12.2/sources/src/main/java/net/minecraft/server/PlayerConnection.java#L431
     @EventHandler
     public void onTick(TickEvent.Post event) {
         assert mc.player != null;
         if (!mc.player.isAlive())
             return;
 
-        // https://github.com/Akarin-project/Akarin/blob/ver/1.12.2/sources/src/main/java/net/minecraft/server/PlayerConnection.java#L431
-        Vec3d moveVec = Vec3d.ZERO;
-        double mySpeed = 1.0 / 256.0;
+        Vec3d vec = Vec3d.ZERO;
+        double mySpeed = 0.045d;
 
-        double x = mc.player.getVelocity().x;
-        double z = mc.player.getVelocity().z;
-        double den = (x*x + z*z) != 0 ? (x*x + z*z) : 1;
-        double n = Math.sqrt((mySpeed * mySpeed) / den);
-
-        moveVec = moveVec.add(x * n, 0, z * n);
         if (mc.player.input.jumping)
-        {
-            moveVec = moveVec.add(0, mySpeed, 0);
-        }
+            vec = vec.add(new Vec3d(0, 1, 0));
         else if (mc.player.input.sneaking)
+            vec = vec.add(new Vec3d(0, -1, 0));
+        else
         {
-            moveVec = moveVec.add(0, -mySpeed, 0);
+            if (mc.player.input.pressingForward)
+                vec = vec.add(new Vec3d(0, 0, 1));
+            if (mc.player.input.pressingRight)
+                vec = vec.add(new Vec3d(1, 0, 0));
+            if (mc.player.input.pressingBack)
+                vec = vec.add(new Vec3d(0, 0, -1));
+            if (mc.player.input.pressingLeft)
+                vec = vec.add(new Vec3d(-1, 0, 0));
         }
-        Vec3d newPos = new Vec3d(mc.player.getX() + moveVec.x, mc.player.getY(), mc.player.getZ() + moveVec.z);
-        mc.player.setPosition(newPos);
 
-        sendPosition(newPos.x, newPos.y + moveVec.y, newPos.z, false);
-        sendPosition(newPos.x, newPos.y - 500, newPos.z, true);
+        if (vec.length() < 0)
+            return;
+        vec = vec.normalize();
+        if (!(vec.x == 0 && vec.z == 0))
+        {
+            double moveAngle = Math.atan2(vec.x, vec.z) + Math.toRadians(mc.player.getYaw() + 90f);
+            double x = Math.cos(moveAngle);
+            double z = Math.sin(moveAngle);
+            vec = new Vec3d(x, vec.y, z);
+        }
+        vec = vec.multiply(mySpeed);
+        Vec3d newPos = new Vec3d(mc.player.getX() + vec.x, mc.player.getY() + vec.y, mc.player.getZ() + vec.z);
+
+        for(int i = 0; i < 5; i++)
+        {
+            if (inSameBlock(newPos.add(vec.multiply(1.5)), new Vec3d(mc.player.prevX, mc.player.prevY, mc.player.prevZ)) && !strict.get())
+                newPos = newPos.add(vec);
+        }
+
+        mc.player.setPosition(newPos);
+        sendPosition(newPos.x, newPos.y, newPos.z, mc.player.isOnGround());
+        sendPosition(newPos.x - 420, newPos.y - 420, newPos.z - 420, mc.player.isOnGround());
     }
 
     private void sendPosition(double x, double y, double z, boolean isOnGround)
     {
         assert mc.player != null;
-
-        // If we figure out a better bypass, i.e. so that server thinks we are not moving at all, then this is
-        // not necessary
         x = FMod.round(x, 3);
         z = FMod.round(z, 3);
         for(int i = 2; i > 0; i--)
