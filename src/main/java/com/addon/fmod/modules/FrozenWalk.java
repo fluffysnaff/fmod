@@ -94,7 +94,7 @@ public class FrozenWalk extends Module
             return;
 
         Vec3d vec = Vec3d.ZERO;
-        double mySpeed = 0.045d;
+        double mySpeed = 1d / 32d + 0.01d;
 
         if (mc.player.input.jumping)
             vec = vec.add(new Vec3d(0, 1, 0));
