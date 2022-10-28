@@ -21,8 +21,14 @@ public class FMod extends MeteorAddon
 
     public static double round(double val, int dec)
     {
-        int decimals = (int)Math.pow(10, dec);
-        long subX = ((long)(val * decimals)) % 10;
+        int decimals = (int) Math.pow(10, dec);
+        LiveWalk liveWalkModule = Modules.get().get(LiveWalk.class);
+        if(liveWalkModule != null && liveWalkModule.classicRoundEnabled())
+        {
+            double n = Math.round(val * decimals) / (double)decimals;
+            return Math.nextAfter(n, n + Math.signum(n));
+        }
+        long subX = ((long) (val * decimals)) % 10;
         return ((val * decimals) - subX) / decimals;
     }
     public static boolean isNotRoundedPos(double x, double z)

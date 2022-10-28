@@ -1,7 +1,6 @@
 package com.addon.fmod.modules;
 
 import com.addon.fmod.FMod;
-import com.addon.fmod.mixin.PlayerPositionLookS2CPacketAccessor;
 import meteordevelopment.meteorclient.events.entity.player.SendMovementPacketsEvent;
 import meteordevelopment.meteorclient.events.packets.PacketEvent;
 import meteordevelopment.meteorclient.settings.BoolSetting;
@@ -12,7 +11,6 @@ import meteordevelopment.orbit.EventHandler;
 import net.minecraft.entity.Entity;
 import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
 import net.minecraft.network.packet.c2s.play.VehicleMoveC2SPacket;
-import net.minecraft.network.packet.s2c.play.PlayerPositionLookS2CPacket;
 
 import java.util.HashSet;
 import java.util.Objects;
@@ -27,13 +25,18 @@ public class LiveWalk extends Module
         .defaultValue(true)
         .build()
     );
-    private final Setting<Boolean> noRotate = sgGeneral.add(new BoolSetting.Builder()
-        .name("no-rotate")
-        .description("Stops sending/receiving pitch/yaw")
+    private final Setting<Boolean> classicRound = sgGeneral.add(new BoolSetting.Builder()
+        .name("classic-round")
+        .description("Classic rounding with Math.round()")
+        .defaultValue(false)
+        .build()
+    );
+    private final Setting<Boolean> cancelPackets = sgGeneral.add(new BoolSetting.Builder()
+        .name("cancel-packets")
+        .description("Disable when using Frozen walk")
         .defaultValue(true)
         .build()
     );
-
     public LiveWalk()
     {
         super(FMod.CATEGORY, "Live Walk", "Bypass Liveoverflow ASP with ease");
@@ -42,6 +45,8 @@ public class LiveWalk extends Module
     private final HashSet<PlayerMoveC2SPacket> packets = new HashSet<>();
     private final HashSet<VehicleMoveC2SPacket> packetsVehicle = new HashSet<>();
     private Entity vehicleEntity = null;
+
+    public boolean classicRoundEnabled() { return classicRound.get(); }
 
     @EventHandler
     public void onSendMovementPackets(SendMovementPacketsEvent.Pre event)
@@ -81,19 +86,11 @@ public class LiveWalk extends Module
     @EventHandler
     public void onPacketSend(PacketEvent.Send event)
     {
-        if ((event.packet instanceof PlayerMoveC2SPacket) && !packets.remove(event.packet)) event.cancel();
-        if ((event.packet instanceof VehicleMoveC2SPacket) && vehicle.get() && !packetsVehicle.remove(event.packet)) event.cancel();
-    }
-
-    @EventHandler
-    public void onRecievePacket(PacketEvent.Receive event)
-    {
-        if (event.packet instanceof PlayerPositionLookS2CPacket && noRotate.get())
+        if(cancelPackets.get())
         {
-            PlayerPositionLookS2CPacketAccessor p = (PlayerPositionLookS2CPacketAccessor) event.packet;
-            assert mc.player != null;
-            p.setPitch(mc.player.getPitch());
-            p.setYaw(mc.player.getYaw());
+            if ((event.packet instanceof PlayerMoveC2SPacket) && !packets.remove(event.packet)) event.cancel();
+            if ((event.packet instanceof VehicleMoveC2SPacket) && vehicle.get() && !packetsVehicle.remove(event.packet))
+                event.cancel();
         }
     }
 
@@ -107,7 +104,7 @@ public class LiveWalk extends Module
             sendPacket(packet);
             return;
         }
-        sendPacket(new PlayerMoveC2SPacket.PositionAndOnGround(x, y, z, mc.player.isOnGround()));
+        sendPacket(new PlayerMoveC2SPacket.Full(x, y, z, mc.player.getYaw(), mc.player.getPitch(), mc.player.isOnGround()));
         mc.player.setPos(x, y, z);
     }
 
