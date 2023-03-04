@@ -75,6 +75,11 @@ public class LiveWalk extends Module
                 dz = FMod.round(dz, i);
             }
         }
+        if (FMod.isNotRoundedPos(dx, dz))
+        {
+            dx = (int)(dx);
+            dz = (int)(dz);
+        }
 
         // Final test
         if (FMod.isNotRoundedPos(dx, dz))
