@@ -1,6 +1,6 @@
 package com.addon.fmod;
 
-//import com.addon.fmod.commands.CommandExample;
+import com.addon.fmod.commands.commands.TeleportCommand;
 import com.addon.fmod.hud.HudExample;
 import com.addon.fmod.modules.FrozenWalk;
 import com.addon.fmod.modules.LiveWalk;
@@ -10,6 +10,7 @@ import meteordevelopment.meteorclient.systems.hud.Hud;
 import meteordevelopment.meteorclient.systems.hud.HudGroup;
 import meteordevelopment.meteorclient.systems.modules.Category;
 import meteordevelopment.meteorclient.systems.modules.Modules;
+import meteordevelopment.meteorclient.systems.commands.Commands;
 import net.minecraft.item.Items;
 import org.slf4j.Logger;
 
@@ -64,5 +65,6 @@ public class FMod extends MeteorAddon
     {
         Modules.get().add(new LiveWalk());
         Modules.get().add(new FrozenWalk());
+        Commands.get().add(new TeleportCommand());
     }
 }
