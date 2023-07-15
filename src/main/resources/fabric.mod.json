@@ -2,10 +2,11 @@
   "schemaVersion": 1,
   "id": "fmod",
   "version": "${version}",
+
   "name": "FMod",
-  "description": "The mod",
+  "description": "Best mod for LiveOverflow server",
   "authors": [
-    "me"
+    "fluffysnaff"
   ],
   "contact": {
     "repo": "https://gitlab.com/fluffysnaff/fmod"
@@ -22,6 +23,11 @@
   ],
   "custom": {
     "meteor-client:color": "90,150,170"
+  },
+  "accessWidener": "meteor-client.accesswidener",
+  "custom": {
+    "meteor-client:color": "227,0,0",
+    "github:sha": "${gh_hash}"
   },
   "depends": {
     "java": ">=17",

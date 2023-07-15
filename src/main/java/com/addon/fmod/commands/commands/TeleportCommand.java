@@ -4,7 +4,7 @@ import com.addon.fmod.commands.arguments.PositionArgumentType;
 import com.mojang.brigadier.arguments.FloatArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import meteordevelopment.meteorclient.systems.commands.Command;
+import meteordevelopment.meteorclient.commands.Command;
 import net.minecraft.command.CommandSource;
 import net.minecraft.entity.Entity;
 import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
@@ -14,6 +14,7 @@ import net.minecraft.util.math.Vec3d;
 import java.util.Objects;
 
 import static com.mojang.brigadier.Command.SINGLE_SUCCESS;
+import static meteordevelopment.meteorclient.MeteorClient.mc;
 
 public class TeleportCommand extends Command {
     public TeleportCommand() {
@@ -29,6 +30,7 @@ public class TeleportCommand extends Command {
 
             assert mc.player != null;
             mc.player.noClip = true;
+            // Send our position multiple times to increase delta
             for (int i = 0; i < (ticks <= 0 ? 1 : ticks); i++)
             {
                 if (mc.player.hasVehicle()) {
@@ -43,6 +45,7 @@ public class TeleportCommand extends Command {
                 mc.player.updatePosition(mc.player.getPos().getX(), mc.player.getPos().getY(), mc.player.getPos().getZ());
             }
 
+            // Then set our own position
             if (mc.player.hasVehicle()) {
                 Entity vehicle = mc.player.getVehicle();
 
