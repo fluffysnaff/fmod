@@ -11,6 +11,10 @@ import meteordevelopment.meteorclient.utils.player.PlayerUtils;
 import net.minecraft.entity.Entity;
 import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
 import net.minecraft.network.packet.c2s.play.VehicleMoveC2SPacket;
+import net.minecraft.util.Hand;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 
@@ -20,6 +24,16 @@ import java.util.Random;
 import static meteordevelopment.meteorclient.MeteorClient.mc;
 
 public class FModUtils {
+    public static void interactAt(BlockPos pos) {
+        if (mc.interactionManager == null) return;
+
+        mc.interactionManager.interactBlock(mc.player, Hand.MAIN_HAND, new BlockHitResult(
+            new Vec3d(pos.getX(), pos.getY(), pos.getZ()),
+            Direction.DOWN,
+            pos,
+            false
+        ));
+    }
     public static void moveTo(Vec3d pos)
     {
         if (mc.player == null) return;

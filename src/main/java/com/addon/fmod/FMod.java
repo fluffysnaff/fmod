@@ -1,7 +1,6 @@
 package com.addon.fmod;
 
-import com.addon.fmod.commands.commands.AutoClipCommand;
-import com.addon.fmod.commands.commands.TeleportCommand;
+import com.addon.fmod.commands.commands.*;
 import com.addon.fmod.hud.HudExample;
 import com.addon.fmod.modules.FrozenWalk;
 import com.addon.fmod.modules.LOPackets;
@@ -74,5 +73,9 @@ public class FMod extends MeteorAddon
     {
         Commands.add(new TeleportCommand());
         Commands.add(new AutoClipCommand());
+        Commands.add(new SHClipCommand());
+        Commands.add(new DClipCommand());
+        Commands.add(new ClubMateCommand());
+
     }
 }
