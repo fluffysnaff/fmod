@@ -31,11 +31,20 @@ public class LiveWalk extends Module
         .defaultValue(false)
         .build()
     );
+
+    private final Setting<Boolean> flyAntiKick = sgGeneral.add(new BoolSetting.Builder()
+        .name("fly-antikick")
+        .description("Don't get kicked for floating.")
+        .defaultValue(false)
+        .build()
+    );
+
     public LiveWalk()
     {
         super(FMod.CATEGORY, "Live Walk", "Bypass Liveoverflow ASP with ease");
     }
     private Entity vehicleEntity = null;
+    int flyingTimer = 0;
 
     public boolean classicRoundEnabled() { return classicRound.get(); }
 
@@ -76,7 +85,19 @@ public class LiveWalk extends Module
         if (FMod.isNotRoundedPos(dx, dz))
             return;
 
-        sendPosition(dx, y, dz, mc.player.getVehicle() != null);
+        if (mc.player.isOnGround() || !flyAntiKick.get())
+        {
+            sendPosition(dx, y, dz, mc.player.getVehicle() != null);
+            flyingTimer = 0;
+            return;
+        }
+        if (++flyingTimer > 20) {
+            sendPosition(dx, y - 0.05, dz, mc.player.getVehicle() != null);
+            flyingTimer = 0;
+        }
+        else {
+            sendPosition(dx, y, dz, mc.player.getVehicle() != null);
+        }
     }
 
     private void sendPosition(double x, double y, double z, boolean v)
