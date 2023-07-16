@@ -73,5 +73,6 @@ public class FMod extends MeteorAddon
     private void initCommandsFMod()
     {
         Commands.add(new TeleportCommand());
+        Commands.add(new AutoClipCommand());
     }
 }
