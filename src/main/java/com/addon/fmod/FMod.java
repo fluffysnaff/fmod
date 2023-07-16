@@ -1,8 +1,10 @@
 package com.addon.fmod;
 
+import com.addon.fmod.commands.commands.AutoClipCommand;
 import com.addon.fmod.commands.commands.TeleportCommand;
 import com.addon.fmod.hud.HudExample;
 import com.addon.fmod.modules.FrozenWalk;
+import com.addon.fmod.modules.LOPackets;
 import com.addon.fmod.modules.LiveWalk;
 import com.mojang.logging.LogUtils;
 import meteordevelopment.meteorclient.addons.MeteorAddon;
@@ -65,6 +67,7 @@ public class FMod extends MeteorAddon
     {
         Modules.get().add(new LiveWalk());
         Modules.get().add(new FrozenWalk());
+        Modules.get().add(new LOPackets());
     }
 
     private void initCommandsFMod()

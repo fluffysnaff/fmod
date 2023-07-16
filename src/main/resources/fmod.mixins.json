@@ -8,6 +8,7 @@
   },
   "mixins": [
     "LivingEntityMixin",
+    "ClientPlayNetworkHandlerMixin",
     "PlayerPositionLookS2CPacketAccessor"
   ]
 }
