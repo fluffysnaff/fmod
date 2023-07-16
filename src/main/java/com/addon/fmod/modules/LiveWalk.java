@@ -31,19 +31,10 @@ public class LiveWalk extends Module
         .defaultValue(false)
         .build()
     );
-    private final Setting<Boolean> cancelPackets = sgGeneral.add(new BoolSetting.Builder()
-        .name("cancel-packets")
-        .description("Disable when using Frozen walk")
-        .defaultValue(true)
-        .build()
-    );
     public LiveWalk()
     {
         super(FMod.CATEGORY, "Live Walk", "Bypass Liveoverflow ASP with ease");
     }
-
-    private final HashSet<PlayerMoveC2SPacket> packets = new HashSet<>();
-    private final HashSet<VehicleMoveC2SPacket> packetsVehicle = new HashSet<>();
     private Entity vehicleEntity = null;
 
     public boolean classicRoundEnabled() { return classicRound.get(); }
@@ -88,17 +79,6 @@ public class LiveWalk extends Module
         sendPosition(dx, y, dz, mc.player.getVehicle() != null);
     }
 
-    @EventHandler
-    public void onPacketSend(PacketEvent.Send event)
-    {
-        if(cancelPackets.get())
-        {
-            if ((event.packet instanceof PlayerMoveC2SPacket) && !packets.remove(event.packet)) event.cancel();
-            if ((event.packet instanceof VehicleMoveC2SPacket) && vehicle.get() && !packetsVehicle.remove(event.packet))
-                event.cancel();
-        }
-    }
-
     private void sendPosition(double x, double y, double z, boolean v)
     {
         assert mc.player != null;
@@ -115,12 +95,10 @@ public class LiveWalk extends Module
 
     private void sendPacket(PlayerMoveC2SPacket packet)
     {
-        packets.add(packet);
         Objects.requireNonNull(mc.getNetworkHandler()).sendPacket(packet);
     }
     private void sendPacket(VehicleMoveC2SPacket packet)
     {
-        packetsVehicle.add(packet);
         Objects.requireNonNull(mc.getNetworkHandler()).sendPacket(packet);
     }
 }
