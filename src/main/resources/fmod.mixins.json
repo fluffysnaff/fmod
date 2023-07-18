@@ -9,6 +9,9 @@
   "mixins": [
     "LivingEntityMixin",
     "ClientPlayNetworkHandlerMixin",
-    "PlayerPositionLookS2CPacketAccessor"
+    "PlayerPositionLookS2CPacketAccessor",
+    "PlayerPositionFullPacketMixin",
+    "PlayerPositionPacketMixin",
+    "VehicleMovePacketMixin"
   ]
 }
