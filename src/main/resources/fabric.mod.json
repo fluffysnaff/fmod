@@ -15,23 +15,18 @@
   "environment": "client",
   "entrypoints": {
     "meteor": [
-      "com.addon.fmod.FMod"
+      "com.example.addon.AddonTemplate"
     ]
   },
   "mixins": [
-    "fmod.mixins.json"
+    "addon-template.mixins.json"
   ],
   "custom": {
-    "meteor-client:color": "90,150,170"
-  },
-  "accessWidener": "meteor-client.accesswidener",
-  "custom": {
-    "meteor-client:color": "227,0,0",
-    "github:sha": "${gh_hash}"
+    "meteor-client:color": "225,25,25"
   },
   "depends": {
-    "java": ">=17",
-    "minecraft": ">=${mc_version}",
+    "java": ">=21",
+    "minecraft": ["${mc_version}"],
     "meteor-client": "*"
   }
 }
