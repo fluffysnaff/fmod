@@ -15,11 +15,11 @@
   "environment": "client",
   "entrypoints": {
     "meteor": [
-      "com.example.addon.AddonTemplate"
+      "addon.fmod.FMod"
     ]
   },
   "mixins": [
-    "addon-template.mixins.json"
+    "fmod.mixins.json"
   ],
   "custom": {
     "meteor-client:color": "225,25,25"
