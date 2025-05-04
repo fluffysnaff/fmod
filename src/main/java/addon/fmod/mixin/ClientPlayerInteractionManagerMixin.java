@@ -30,7 +30,6 @@ public class ClientPlayerInteractionManagerMixin {
         if (instaMine != null && instaMine.isActive()) {
             BlockState blockState = mc.world.getBlockState(pos);
             double speed = blockState.calcBlockBreakingDelta(mc.player, mc.world, pos);
-            LOG.info(String.valueOf(speed));
             if (!blockState.isAir() && speed > 0.5F) {  // If you can break the block fast enough, break it instantly
                 mc.world.breakBlock(pos, true, mc.player);
                 Objects.requireNonNull(mc.getNetworkHandler()).sendPacket(new PlayerActionC2SPacket(PlayerActionC2SPacket.Action.START_DESTROY_BLOCK, pos, direction));

@@ -1,12 +1,14 @@
 package addon.fmod.utils;
 
-import net.minecraft.util.math.Vec3d;
-import org.spongepowered.asm.mixin.injection.invoke.arg.Args;
-
 public class RoundUtils {
     public static double round(double val, int dec)
     {
         int decimals = (int) Math.pow(10, dec);
+        // This is a normal floating point fix with rounds
+        // double n = Math.round(val * decimals) / (double)decimals;
+        // return Math.nextAfter(n, n + Math.signum(n)); // this tries to fix floating point errors
+
+        // floating point fix by subtracting the decimal value that's being checked
         long subX = ((long) (val * decimals)) % 10;
         return ((val * decimals) - subX) / decimals;
     }
