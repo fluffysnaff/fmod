@@ -1,7 +1,8 @@
 package addon.fmod;
 
 import addon.fmod.commands.CommandExample;
-import addon.fmod.hud.HudExample;
+import addon.fmod.hud.InfReachHud;
+import addon.fmod.modules.InfReach;
 import addon.fmod.modules.InstaMine;
 import addon.fmod.modules.LiveWalk;
 import addon.fmod.modules.TpMine;
@@ -49,6 +50,7 @@ public class FMod extends MeteorAddon {
         Modules.get().add(new InstaMine());
         Modules.get().add(new LiveWalk());
         Modules.get().add(new TpMine());
+        Modules.get().add(new InfReach());
         // Modules.get().add(new FrozenWalk());
         // Modules.get().add(new LOPackets());
     }
@@ -65,6 +67,6 @@ public class FMod extends MeteorAddon {
 
     private void initHudFMod()
     {
-        Hud.get().register(HudExample.INFO);
+        Hud.get().register(InfReachHud.INFO);
     }
 }
