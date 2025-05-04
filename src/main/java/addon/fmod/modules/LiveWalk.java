@@ -18,7 +18,7 @@ public class LiveWalk extends Module
 
     public LiveWalk()
     {
-        super(FMod.CATEGORY, "Live Walk", "Bypass Liveoverflow skiddy plugin with ease.");
+        super(FMod.CATEGORY, "live-walk", "Bypass Liveoverflow skiddy plugin with ease.");
     }
 
     public boolean vehicleEnabled() { return vehicle.get(); }

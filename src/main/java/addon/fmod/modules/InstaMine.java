@@ -12,7 +12,7 @@ public class InstaMine extends Module
 
     public InstaMine()
     {
-        super(FMod.CATEGORY, "Insta Mine", "Attempts to stop mining at 70% progress");
+        super(FMod.CATEGORY, "insta-mine", "Attempts to stop mining at 70% progress");
     }
 
 
