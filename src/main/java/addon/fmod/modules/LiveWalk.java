@@ -8,7 +8,6 @@ import meteordevelopment.meteorclient.systems.modules.Module;
 
 public class LiveWalk extends Module
 {
-
     private final SettingGroup sgGeneral = settings.getDefaultGroup();
     private final Setting<Boolean> vehicle = sgGeneral.add(new BoolSetting.Builder()
         .name("vehicle")

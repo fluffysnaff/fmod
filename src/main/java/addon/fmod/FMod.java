@@ -4,6 +4,7 @@ import addon.fmod.commands.CommandExample;
 import addon.fmod.hud.HudExample;
 import addon.fmod.modules.InstaMine;
 import addon.fmod.modules.LiveWalk;
+import addon.fmod.modules.TpMine;
 import com.mojang.logging.LogUtils;
 import meteordevelopment.meteorclient.addons.MeteorAddon;
 import meteordevelopment.meteorclient.commands.Commands;
@@ -40,13 +41,14 @@ public class FMod extends MeteorAddon {
 
     @Override
     public String getPackage() {
-        return "java.addon.fmod";
+        return "addon.fmod";
     }
 
     private void initModulesFMod()
     {
-        Modules.get().add(new LiveWalk());
         Modules.get().add(new InstaMine());
+        Modules.get().add(new LiveWalk());
+        Modules.get().add(new TpMine());
         // Modules.get().add(new FrozenWalk());
         // Modules.get().add(new LOPackets());
     }
