@@ -83,7 +83,7 @@ public class TpMine extends Module {
             Vec3d endPos = new Vec3d(tx, ty, tz); // This target position might be inside a block, adjust as needed
 
             // Exploit
-            WarpUtils.warpTo(endPos);
+            WarpUtils.warpTo(endPos, 9);
 
             // Break block
             BlockUtils.breakBlock(pos, true);

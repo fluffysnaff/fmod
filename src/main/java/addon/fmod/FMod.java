@@ -1,6 +1,6 @@
 package addon.fmod;
 
-import addon.fmod.commands.CommandExample;
+import addon.fmod.commands.commands.*;
 import addon.fmod.hud.InfReachHud;
 import addon.fmod.modules.InfReach;
 import addon.fmod.modules.InstaMine;
@@ -57,12 +57,11 @@ public class FMod extends MeteorAddon {
 
     private void initCommandsFMod()
     {
-        Commands.add(new CommandExample());
-        // Commands.add(new TeleportCommand());
-        // Commands.add(new AutoClipCommand());
-        // Commands.add(new SHClipCommand());
-        // Commands.add(new DClipCommand());
-        // Commands.add(new ClubMateCommand());
+        Commands.add(new TeleportCommand());
+        Commands.add(new AutoClipCommand());
+        Commands.add(new SHClipCommand());
+        Commands.add(new DClipCommand());
+        Commands.add(new ClubMateCommand());
     }
 
     private void initHudFMod()

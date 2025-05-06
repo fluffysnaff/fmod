@@ -161,7 +161,7 @@ public class InfReach extends Module {
         Vec3d targetPos = target.getPos();
 
         // Exploit
-        WarpUtils.warpTo(targetPos);
+        WarpUtils.warpTo(targetPos, 9);
 
         // Attack
         mc.interactionManager.attackEntity(mc.player, target);
