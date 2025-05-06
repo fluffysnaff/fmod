@@ -1,4 +1,4 @@
-# FMod - Meteor Client Addon
+# FMod
 
 <div align="center">
   <img src="src/main/resources/assets/template/icon.PNG" alt="FMod Logo" width="200"/>
