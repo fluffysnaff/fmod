@@ -1,17 +1,18 @@
 {
   "required": true,
-  "package": "com.addon.fmod.mixin",
-  "compatibilityLevel": "JAVA_17",
-  "client": [],
+  "package": "addon.fmod.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "PlayerMoveC2SPacketAccessor",
+    "PlayerPositionPacketMixin",
+    "VehicleMovePacketMixin",
+    "VehicleMoveC2SPacketAccessor",
+    "PlayerPositionFullPacketMixin",
+    "ClientPlayerInteractionManagerMixin",
+    "AbstractBlockBlockStateMixin",
+    "AbstractBlockMixin"
+  ],
   "injectors": {
     "defaultRequire": 1
-  },
-  "mixins": [
-    "LivingEntityMixin",
-    "ClientPlayNetworkHandlerMixin",
-    "PlayerPositionLookS2CPacketAccessor",
-    "PlayerPositionFullPacketMixin",
-    "PlayerPositionPacketMixin",
-    "VehicleMovePacketMixin"
-  ]
+  }
 }
