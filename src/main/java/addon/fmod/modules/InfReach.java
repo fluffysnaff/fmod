@@ -11,29 +11,21 @@ import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.utils.player.PlayerUtils;
 import meteordevelopment.meteorclient.utils.render.color.Color;
 import meteordevelopment.meteorclient.utils.render.color.SettingColor;
-import meteordevelopment.meteorclient.utils.world.BlockUtils;
 import meteordevelopment.orbit.EventHandler;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.passive.AnimalEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.util.Hand;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.EntityHitResult;
-import net.minecraft.entity.projectile.ProjectileUtil;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.GameMode;
 
 import java.util.Set;
 
-public class InfReach extends Module
-{
-    private final SettingGroup sgGeneral = this.settings.getDefaultGroup();
-    private final SettingGroup sgRender = this.settings.createGroup("Render");
+public class InfReach extends Module {
+    private final SettingGroup sgGeneral = settings.getDefaultGroup();
+    private final SettingGroup sgRender = settings.createGroup("Render");
     private final SettingGroup sgTargeting = settings.createGroup("Targeting");
 
     private final Setting<Double> scale = sgGeneral.add(new DoubleSetting.Builder()
@@ -76,19 +68,15 @@ public class InfReach extends Module
         .build()
     );
 
+    private Entity closestEntity;
 
-    public InfReach()
-    {
+    public InfReach() {
         super(FMod.CATEGORY, "inf-reach", "Tries to teleport to the closest target near your aim and hit him from far away.");
     }
 
-    private Entity closestEntity;
     public Entity getClosestEntity() {
         return closestEntity;
     }
-
-    private Vec3d startPos = null;
-    private Vec3d targetPos = null;
 
     @Override
     public void onDeactivate() {
@@ -101,19 +89,19 @@ public class InfReach extends Module
             closestEntity = null;
             return;
         }
+
         if (!mc.player.isAlive() || PlayerUtils.getGameMode() == GameMode.SPECTATOR) return;
 
         Vec3d origin = mc.player.getCameraPosVec(1.0F);
         Vec3d direction = mc.player.getRotationVec(1.0F).normalize();
         double maxDistance = range.get();
-        double maxAngleThreshold = Math.toRadians(fov.get()); // 10 degrees
+        double maxAngleThreshold = Math.toRadians(fov.get());
 
-        Entity closest = null;
+        Entity currentClosest = null;
         double closestAngle = Double.MAX_VALUE;
 
         for (Entity entity : mc.world.getEntities()) {
-            if (entity == null) continue;
-            if (!canAttack(entity)) continue;
+            if (entity == null || !canAttack(entity)) continue;
 
             Vec3d toEntity = entity.getPos().add(0, entity.getHeight() / 2.0, 0).subtract(origin);
             double distance = toEntity.length();
@@ -121,15 +109,13 @@ public class InfReach extends Module
 
             double angle = Math.acos(direction.dotProduct(toEntity.normalize()));
             if (angle < closestAngle && angle <= maxAngleThreshold) {
-                closest = entity;
+                currentClosest = entity;
                 closestAngle = angle;
             }
         }
-
-        closestEntity = closest;
+        closestEntity = currentClosest;
 
         if (closestEntity == null) return;
-        if (!canAttack(closestEntity)) return;
         if (!mc.options.attackKey.isPressed()) return;
 
         hitEntity(closestEntity);
@@ -142,6 +128,7 @@ public class InfReach extends Module
         Box box = closestEntity.getBoundingBox();
         Vec3d center = box.getCenter();
         double scaleFactor = scale.get();
+
         double halfLengthX = (box.getLengthX() * scaleFactor) / 2.0;
         double halfLengthY = (box.getLengthY() * scaleFactor) / 2.0;
         double halfLengthZ = (box.getLengthZ() * scaleFactor) / 2.0;
@@ -170,16 +157,8 @@ public class InfReach extends Module
     private void hitEntity(Entity target) {
         if (mc.interactionManager == null || mc.player == null || target == null) return;
 
-        startPos = mc.player.getPos();
-        targetPos = target.getPos();
-
-        // Try detecting failed warp
-        Vec3d currentPos = mc.player.getPos();
-        if (currentPos.squaredDistanceTo(targetPos) < 0.5 && canAttack(target)) {
-            // Too close to target (warp failed or glitch), go back
-            WarpUtils.moveTo(startPos);
-            mc.player.setPosition(startPos);
-        }
+        Vec3d startPos = mc.player.getPos();
+        Vec3d targetPos = target.getPos();
 
         // Exploit
         WarpUtils.warpTo(targetPos);
@@ -188,10 +167,8 @@ public class InfReach extends Module
         mc.interactionManager.attackEntity(mc.player, target);
         mc.player.swingHand(Hand.MAIN_HAND);
 
-        // Move back
+        // Go back
         WarpUtils.moveTo(startPos);
-        mc.player.setPosition(startPos);
+        mc.player.setPosition(startPos); // Ensure client position is synced
     }
-
-
 }
