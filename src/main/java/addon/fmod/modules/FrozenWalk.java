@@ -5,6 +5,7 @@ import addon.fmod.utils.RoundUtils;
 import meteordevelopment.meteorclient.events.entity.player.SendMovementPacketsEvent;
 import meteordevelopment.meteorclient.events.packets.PacketEvent;
 import meteordevelopment.meteorclient.events.world.TickEvent;
+import meteordevelopment.meteorclient.mixin.ClientPlayerEntityAccessor;
 import meteordevelopment.meteorclient.settings.BoolSetting;
 import meteordevelopment.meteorclient.settings.Setting;
 import meteordevelopment.meteorclient.settings.SettingGroup;
@@ -23,7 +24,7 @@ public class FrozenWalk extends Module
 
     public FrozenWalk()
     {
-        super(FMod.CATEGORY, "Frozen Walk", "Get into protected regions without being teleported");
+        super(FMod.CATEGORY, "frozen-walk", "Get into protected regions without being teleported");
     }
     private final Setting<Boolean> antiFlyKick = sgGeneral.add(new BoolSetting.Builder()
         .name("anti-fly-kick")
@@ -111,7 +112,7 @@ public class FrozenWalk extends Module
         Vec3d newPos = new Vec3d(mc.player.getX() + vec.x, mc.player.getY() + vec.y, mc.player.getZ() + vec.z);
 
         // If we don't have strict enabled, check if when we move we'll be in the same block
-        for(int i = 0; i < 5; i++)
+        for(int i = 0; i < 10; i++)
         {
             if (inSameBlock(newPos.add(vec.multiply(1.5)), new Vec3d(mc.player.lastX, mc.player.lastY, mc.player.lastZ)) && !strict.get())
                 newPos = newPos.add(vec);
