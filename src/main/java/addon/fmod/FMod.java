@@ -2,10 +2,7 @@ package addon.fmod;
 
 import addon.fmod.commands.commands.*;
 import addon.fmod.hud.InfReachHud;
-import addon.fmod.modules.InfReach;
-import addon.fmod.modules.InstaMine;
-import addon.fmod.modules.LiveWalk;
-import addon.fmod.modules.TpMine;
+import addon.fmod.modules.*;
 import com.mojang.logging.LogUtils;
 import meteordevelopment.meteorclient.addons.MeteorAddon;
 import meteordevelopment.meteorclient.commands.Commands;
@@ -51,7 +48,7 @@ public class FMod extends MeteorAddon {
         Modules.get().add(new LiveWalk());
         Modules.get().add(new TpMine());
         Modules.get().add(new InfReach());
-        // Modules.get().add(new FrozenWalk());
+        Modules.get().add(new FrozenWalk());
         // Modules.get().add(new LOPackets());
     }
 

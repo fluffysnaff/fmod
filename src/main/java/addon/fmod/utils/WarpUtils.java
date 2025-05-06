@@ -24,10 +24,10 @@ public class WarpUtils {
 
         if (mc.player.getVehicle() != null) {
             mc.player.getVehicle().setPosition(pos);
-            mc.player.networkHandler.sendPacket(new VehicleMoveC2SPacket(pos, mc.player.getVehicle().getYaw(), mc.player.getVehicle().getPitch(), true));
+            mc.player.networkHandler.sendPacket(new VehicleMoveC2SPacket(pos, mc.player.getVehicle().getYaw(), mc.player.getVehicle().getPitch(),  mc.player.horizontalCollision));
         } else {
             mc.player.setPosition(pos);
-            mc.player.networkHandler.sendPacket(new PlayerMoveC2SPacket.PositionAndOnGround(pos.x, pos.y, pos.z, true, true));
+            mc.player.networkHandler.sendPacket(new PlayerMoveC2SPacket.PositionAndOnGround(pos.x, pos.y, pos.z, true,  mc.player.horizontalCollision));
         }
     }
 
