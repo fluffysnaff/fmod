@@ -1,7 +1,7 @@
 # FMod - Meteor Client Addon
 
 <p align="center">
-  <img src="src/main/resources/assets/template/icon.png" alt="FMod Logo" width="200"/>
+  <img src="src/main/resources/assets/template/icon.PNG" alt="FMod Logo" width="200"/>
 </p>
 
 **FMod** is an addon for the [Meteor Client](https://meteorclient.com/), a modern Minecraft utility mod. FMod enhances your gameplay with a suite of powerful movement utilities, combat assistance, and other useful features, with some specifically tailored for servers like the LiveOverflow server.
