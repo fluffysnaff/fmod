@@ -39,7 +39,7 @@ public class TpMine extends Module {
     private final Setting<SettingColor> targetColor = sgRender.add(new ColorSetting.Builder()
         .name("render-color")
         .description("Set target block render color.")
-        .defaultValue(new SettingColor(0, 255, 150, 255))
+        .defaultValue(new SettingColor(255, 0, 255, 120))
         .visible(isRenderBlock::get)
         .build()
     );
@@ -59,7 +59,6 @@ public class TpMine extends Module {
 
         if (mc.options.attackKey.isPressed()) {
             if (hitResult.getType() == HitResult.Type.BLOCK) {
-                Vec3d startPos = mc.player.getPos();
                 Direction side = ((BlockHitResult) hitResult).getSide();
                 BlockState state = mc.world.getBlockState(pos);
                 VoxelShape shape = state.getCollisionShape(mc.world, pos);
@@ -67,15 +66,16 @@ public class TpMine extends Module {
                 double height = shape.isEmpty() ? 1 : shape.getMax(Direction.Axis.Y);
                 double tx = pos.getX() + 0.5 + side.getOffsetX(), ty = pos.getY() + height, tz = pos.getZ() + 0.5 + side.getOffsetZ();
 
-                for (int i = 0; i < 9; i++) {
-                    WarpUtils.moveTo(mc.player.getPos());
-                }
-
+                Vec3d startPos = mc.player.getPos();
                 Vec3d endPos = new Vec3d(tx, ty, tz);
-                WarpUtils.moveTo(endPos);
 
+                // Exploit
+                WarpUtils.warpTo(endPos);
+
+                // Break block
                 BlockUtils.breakBlock(((BlockHitResult) hitResult).getBlockPos(), true);
 
+                // Move back
                 WarpUtils.moveTo(startPos);
                 mc.player.setPosition(startPos);
             }
@@ -86,6 +86,6 @@ public class TpMine extends Module {
     public void onRender(Render3DEvent event) {
         if (!isRenderBlock.get()) return;
         if (pos == null || hitResult.getType() != HitResult.Type.BLOCK) return;
-        RenderUtils.renderTickingBlock(pos, targetColor.get(), targetColor.get(), ShapeMode.Lines, 0, 0, false, false);
+        RenderUtils.renderTickingBlock(pos, targetColor.get(), targetColor.get(), ShapeMode.Both, 0, 0, false, false);
     }
 }

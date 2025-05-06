@@ -54,7 +54,16 @@ public class InfReach extends Module
     private final Setting<Double> range = sgGeneral.add(new DoubleSetting.Builder()
         .name("range")
         .description("The maximum range the entity can be to attack it.")
-        .defaultValue(50)
+        .defaultValue(99)
+        .min(0)
+        .sliderMax(99)
+        .build()
+    );
+
+    private final Setting<Double> fov = sgGeneral.add(new DoubleSetting.Builder()
+        .name("fov")
+        .description("The maximum fov the entity can be in to attack it.")
+        .defaultValue(10)
         .min(0)
         .sliderMax(50)
         .build()
@@ -78,6 +87,9 @@ public class InfReach extends Module
         return closestEntity;
     }
 
+    private Vec3d startPos = null;
+    private Vec3d targetPos = null;
+
     @Override
     public void onDeactivate() {
         closestEntity = null;
@@ -94,7 +106,7 @@ public class InfReach extends Module
         Vec3d origin = mc.player.getCameraPosVec(1.0F);
         Vec3d direction = mc.player.getRotationVec(1.0F).normalize();
         double maxDistance = range.get();
-        double maxAngleThreshold = Math.toRadians(10); // 10 degrees
+        double maxAngleThreshold = Math.toRadians(fov.get()); // 10 degrees
 
         Entity closest = null;
         double closestAngle = Double.MAX_VALUE;
@@ -156,24 +168,30 @@ public class InfReach extends Module
     }
 
     private void hitEntity(Entity target) {
-        if(mc.interactionManager == null) return;
-        if(mc.player == null) return;
-        if(target == null) return;
-        double tx = target.getX(), ty = target.getY(), tz = target.getZ();
-        Vec3d startPos = mc.player.getPos();
-        Vec3d targetPos = new Vec3d(tx, ty, tz);
+        if (mc.interactionManager == null || mc.player == null || target == null) return;
 
-        for (int i = 0; i < 9; i++) {
-            WarpUtils.moveTo(mc.player.getPos());
+        startPos = mc.player.getPos();
+        targetPos = target.getPos();
+
+        // Try detecting failed warp
+        Vec3d currentPos = mc.player.getPos();
+        if (currentPos.squaredDistanceTo(targetPos) < 0.5 && canAttack(target)) {
+            // Too close to target (warp failed or glitch), go back
+            WarpUtils.moveTo(startPos);
+            mc.player.setPosition(startPos);
         }
 
-        WarpUtils.moveTo(targetPos);
+        // Exploit
+        WarpUtils.warpTo(targetPos);
 
+        // Attack
         mc.interactionManager.attackEntity(mc.player, target);
         mc.player.swingHand(Hand.MAIN_HAND);
 
+        // Move back
         WarpUtils.moveTo(startPos);
         mc.player.setPosition(startPos);
     }
+
 
 }

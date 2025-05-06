@@ -6,6 +6,18 @@ import net.minecraft.util.math.Vec3d;
 import static meteordevelopment.meteorclient.MeteorClient.mc;
 
 public class WarpUtils {
+    public static void warpTo(Vec3d pos) {
+        if (mc.player == null) return;
+
+        // Exploit
+        for (int i = 0; i < 9; i++) {
+            moveTo(mc.player.getPos());
+        }
+
+        // Tp to pos
+        moveTo(pos);
+    }
+
     public static void moveTo(Vec3d pos)
     {
         if (mc.player == null) return;
