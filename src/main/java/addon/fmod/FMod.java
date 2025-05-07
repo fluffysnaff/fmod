@@ -3,6 +3,7 @@ package addon.fmod;
 import addon.fmod.commands.commands.*;
 import addon.fmod.hud.InfReachHud;
 import addon.fmod.modules.*;
+import addon.fmod.modules.notexturerotations.NoTextureRotations;
 import com.mojang.logging.LogUtils;
 import meteordevelopment.meteorclient.addons.MeteorAddon;
 import meteordevelopment.meteorclient.commands.Commands;

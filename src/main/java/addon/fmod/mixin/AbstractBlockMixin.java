@@ -1,10 +1,8 @@
 package addon.fmod.mixin;
 
-import addon.fmod.FMod;
-import addon.fmod.modules.NoTextureRotations;
+import addon.fmod.modules.notexturerotations.NoTextureRotations;
 import meteordevelopment.meteorclient.systems.modules.Modules;
 import net.minecraft.block.AbstractBlock;
-import net.minecraft.util.math.BlockPos;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -17,7 +15,10 @@ public class AbstractBlockMixin {
         if (Modules.get() == null) return;
         NoTextureRotations noTextureRotations = Modules.get().get(NoTextureRotations.class);
         if(noTextureRotations != null && noTextureRotations.isActive()) {
-            cir.setReturnValue(42L);
+            switch(noTextureRotations.getCurrentMode()) {
+                case NO_ROTATIONS -> cir.setReturnValue(42L);
+                case SECURE_RANDOM -> cir.setReturnValue(NoTextureRotations.secureRandom.nextLong());
+            }
         }
     }
 }
