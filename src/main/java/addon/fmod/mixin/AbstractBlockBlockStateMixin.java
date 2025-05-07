@@ -22,6 +22,13 @@ public class AbstractBlockBlockStateMixin {
             switch(noTextureRotations.getCurrentMode()) {
                 case NO_ROTATIONS -> cir.setReturnValue(Vec3d.ZERO);
                 case SECURE_RANDOM -> posRef.set(BlockPos.fromLong(NoTextureRotations.secureRandom.nextLong()));
+                case RANDOM_OFFSET -> posRef.set(
+                    new BlockPos(
+                        posRef.get().getX() + NoTextureRotations.offsetsRandomOffsetX,
+                        posRef.get().getY() + NoTextureRotations.offsetsRandomOffsetY,
+                        posRef.get().getZ() + NoTextureRotations.offsetsRandomOffsetZ
+                    )
+                );
             }
         }
     }

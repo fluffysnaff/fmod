@@ -33,6 +33,11 @@ public class NoTextureRotations extends Module {
     }
 
     public static final SecureRandom secureRandom = new SecureRandom();
+    public static final long rotationsRandomOffset = secureRandom.nextLong();
+    private static final int offsetsBound = 1000000;
+    public static final int offsetsRandomOffsetX = secureRandom.nextInt(-offsetsBound, offsetsBound);
+    public static final int offsetsRandomOffsetY = secureRandom.nextInt(-offsetsBound, offsetsBound);
+    public static final int offsetsRandomOffsetZ = secureRandom.nextInt(-offsetsBound, offsetsBound);
 
     private void onModeChanged(NoTextureRotationsModes mode) {
         currentMode = mode;
