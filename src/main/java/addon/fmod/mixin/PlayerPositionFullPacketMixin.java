@@ -14,10 +14,10 @@ import addon.fmod.utils.RoundUtils;
 public abstract class PlayerPositionFullPacketMixin
 {
     // Target the CORRECT constructor signature found by Mixin
-    @Inject(method = "<init>(Lnet/minecraft/util/math/Vec3d;FFZZ)V",
+    @Inject(method = "<init>(DDDFFZZ)V",
         at = @At("RETURN"))
     // Update injector parameters to MATCH the target signature
-    private void onInitReturn_Full(Vec3d position, float yaw, float pitch, boolean onGround, boolean changesPosition, CallbackInfo ci)
+    private void onInitReturn_Full(double x, double y, double z, float yaw, float pitch, boolean onGround, boolean changesPosition, CallbackInfo ci)
     {
         LiveWalk liveWalk = Modules.get().get(LiveWalk.class);
         if (liveWalk != null && liveWalk.isActive()) {

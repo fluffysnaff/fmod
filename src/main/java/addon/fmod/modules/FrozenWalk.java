@@ -114,7 +114,7 @@ public class FrozenWalk extends Module
         // If we don't have strict enabled, check if when we move we'll be in the same block
         for(int i = 0; i < 10; i++)
         {
-            if (inSameBlock(newPos.add(vec.multiply(1.5)), new Vec3d(mc.player.lastX, mc.player.lastY, mc.player.lastZ)) && !strict.get())
+            if (inSameBlock(newPos.add(vec.multiply(1.5)), new Vec3d(mc.player.getX(), mc.player.getY(), mc.player.getZ())) && !strict.get())
                 newPos = newPos.add(vec);
         }
 

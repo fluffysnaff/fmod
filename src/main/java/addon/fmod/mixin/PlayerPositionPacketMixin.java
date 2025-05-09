@@ -16,10 +16,10 @@ import static addon.fmod.FMod.LOG;
 public class PlayerPositionPacketMixin {
 
     // Correct the target method signature in the annotation
-    @Inject(method = "<init>(Lnet/minecraft/util/math/Vec3d;ZZ)V", // <-- MATCHES EXPECTED (Vec3d, boolean, boolean)
+    @Inject(method = "<init>(DDDZZ)V",
         at = @At("RETURN"))
     // Correct the parameters of the injector method to match the target signature
-    private void onInitReturn_PosGround(Vec3d pos, boolean onGround, boolean changePosition, CallbackInfo ci) { // <-- MATCHES (Vec3d, boolean, boolean)
+    private void onInitReturn_PosGround(double x, double y, double z, boolean onGround, boolean changePosition, CallbackInfo ci) {
         // Check if the module is active
         if ((Modules.get().get(LiveWalk.class)).isActive()) {
             // Cast 'this' to our accessor (still valid)
