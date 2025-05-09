@@ -2,6 +2,7 @@ package addon.fmod.modules;
 
 import addon.fmod.FMod;
 import addon.fmod.utils.WarpUtils;
+import meteordevelopment.meteorclient.events.packets.PacketEvent;
 import meteordevelopment.meteorclient.events.render.Render3DEvent;
 import meteordevelopment.meteorclient.events.world.TickEvent;
 import meteordevelopment.meteorclient.renderer.ShapeMode;
@@ -16,12 +17,17 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
+import net.minecraft.network.packet.c2s.play.VehicleMoveC2SPacket;
 import net.minecraft.util.Hand;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.GameMode;
 
+import java.util.HashSet;
 import java.util.Set;
+
+import static meteordevelopment.meteorclient.MeteorClient.mc;
 
 public class InfReach extends Module {
     private final SettingGroup sgGeneral = settings.getDefaultGroup();
@@ -76,6 +82,14 @@ public class InfReach extends Module {
 
     public Entity getClosestEntity() {
         return closestEntity;
+    }
+
+    private final HashSet<PlayerMoveC2SPacket> packets = new HashSet<>();
+    @EventHandler
+    public void onPacketSend(PacketEvent.Send event)
+    {
+        if(packets.isEmpty()) return;
+        if ((event.packet instanceof PlayerMoveC2SPacket) && !packets.remove(event.packet)) event.cancel();
     }
 
     @Override
@@ -161,14 +175,36 @@ public class InfReach extends Module {
         Vec3d targetPos = target.getPos();
 
         // Exploit
-        WarpUtils.warpTo(targetPos, 9);
+        warpTo(targetPos, 9);
 
         // Attack
         mc.interactionManager.attackEntity(mc.player, target);
         mc.player.swingHand(Hand.MAIN_HAND);
 
         // Go back
-        WarpUtils.moveTo(startPos);
+        moveTo(startPos);
         mc.player.setPosition(startPos); // Ensure client position is synced
+    }
+
+    public void warpTo(Vec3d pos, int ticks) {
+        if (mc.player == null) return;
+
+        // Exploit
+        for (int i = 0; i < ticks; i++) {
+            moveTo(mc.player.getPos());
+        }
+
+        // Tp to pos
+        moveTo(pos);
+    }
+
+    public void moveTo(Vec3d pos)
+    {
+        if (mc.player == null) return;
+
+        PlayerMoveC2SPacket movePacket = new PlayerMoveC2SPacket.PositionAndOnGround(pos.x, pos.y, pos.z, true,  mc.player.horizontalCollision);
+        packets.add(movePacket);
+        mc.player.setPosition(pos);
+        mc.player.networkHandler.sendPacket(movePacket);
     }
 }
