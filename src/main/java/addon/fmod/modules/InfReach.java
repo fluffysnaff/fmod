@@ -17,6 +17,7 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.network.packet.c2s.play.ClientCommandC2SPacket;
 import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
 import net.minecraft.network.packet.c2s.play.VehicleMoveC2SPacket;
 import net.minecraft.util.Hand;
@@ -27,6 +28,7 @@ import net.minecraft.world.GameMode;
 import java.util.HashSet;
 import java.util.Set;
 
+import static addon.fmod.FMod.LOG;
 import static meteordevelopment.meteorclient.MeteorClient.mc;
 
 public class InfReach extends Module {
@@ -172,39 +174,43 @@ public class InfReach extends Module {
         if (mc.interactionManager == null || mc.player == null || target == null) return;
 
         Vec3d startPos = mc.player.getPos();
-        Vec3d targetPos = target.getPos();
+        Vec3d targetPos = target.getPos().subtract(  // Subtract a bit from the end
+            target.getPos().subtract(startPos).normalize().multiply(2)
+        );
+
+        mc.player.networkHandler.sendPacket(new ClientCommandC2SPacket(mc.player, ClientCommandC2SPacket.Mode.START_FALL_FLYING));
 
         // Exploit
-        warpTo(targetPos, 9);
+        warpTo(targetPos);
 
         // Attack
         mc.interactionManager.attackEntity(mc.player, target);
         mc.player.swingHand(Hand.MAIN_HAND);
 
         // Go back
-        moveTo(startPos);
-        mc.player.setPosition(startPos); // Ensure client position is synced
+        PlayerMoveC2SPacket movePacket = new PlayerMoveC2SPacket.PositionAndOnGround(startPos.x, startPos.y, startPos.z, true, mc.player.horizontalCollision);
+        packets.add(movePacket);
+        mc.player.networkHandler.sendPacket(movePacket);
+        mc.player.setPosition(startPos);
     }
 
-    public void warpTo(Vec3d pos, int ticks) {
+    public void warpTo(Vec3d pos) {
         if (mc.player == null) return;
 
+        Vec3d newPos = new Vec3d(pos.getX() + 0.5, pos.getY() + 1, pos.getZ() + 0.5);
+        int packetsRequired = (int) Math.ceil(mc.player.getPos().distanceTo(newPos) / 10) - 1;
+
         // Exploit
-        for (int i = 0; i < ticks; i++) {
-            moveTo(mc.player.getPos());
+        for (int packetNumber = 0; packetNumber < (packetsRequired); packetNumber++) {
+            PlayerMoveC2SPacket movePacket = new PlayerMoveC2SPacket.OnGroundOnly(true, mc.player.horizontalCollision);
+            packets.add(movePacket);
+            mc.player.networkHandler.sendPacket(movePacket);
         }
 
         // Tp to pos
-        moveTo(pos);
-    }
-
-    public void moveTo(Vec3d pos)
-    {
-        if (mc.player == null) return;
-
-        PlayerMoveC2SPacket movePacket = new PlayerMoveC2SPacket.PositionAndOnGround(pos.x, pos.y, pos.z, true,  mc.player.horizontalCollision);
+        PlayerMoveC2SPacket movePacket = new PlayerMoveC2SPacket.PositionAndOnGround(newPos.x, newPos.y, newPos.z, true, mc.player.horizontalCollision);
         packets.add(movePacket);
-        mc.player.setPosition(pos);
         mc.player.networkHandler.sendPacket(movePacket);
+        mc.player.setPosition(newPos);
     }
 }
