@@ -28,6 +28,7 @@ FMod introduces a variety of modules, commands, and HUD elements designed to giv
 *   **`InfReach`**: Targets the closest entity within your aim and a configurable range. It then teleports you to the target, attacks it, and returns you to your starting position. Includes on-screen target highlighting.
 *   **`FrozenWalk`**: Allows you to move within protected regions or bypass certain movement restrictions without being teleported back by the server. Includes an anti-fly-kick feature.
 *   **`NoTextureRotations`**: Disables the random rotation of certain block textures (e.g., grass, sand, bedrock), providing a more consistent and potentially cleaner visual experience. *Requires a world rejoin or graphics reload to take full effect.*
+*   **`FrameDupe`**: A utility that automatically interacts with nearby item frames to duplicate items. It works by quickly placing and breaking items in frames, which can trigger duplication glitches on certain servers.
 
 ### ⌨️ Commands
 
