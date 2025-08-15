@@ -47,11 +47,11 @@ public class FMod extends MeteorAddon {
     {
         Modules.get().add(new LiveWalk());
         Modules.get().add(new FrozenWalk());
-        Modules.get().add(new LOPackets());
         Modules.get().add(new InfReach());
         Modules.get().add(new TpMine());
         Modules.get().add(new InstaMine());
         Modules.get().add(new NoTextureRotations());
+        Modules.get().add(new FrameDupe());
     }
 
     private void initCommandsFMod()

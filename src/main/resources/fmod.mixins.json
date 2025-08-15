@@ -10,8 +10,7 @@
     "PlayerPositionFullPacketMixin",
     "ClientPlayerInteractionManagerMixin",
     "AbstractBlockBlockStateMixin",
-    "AbstractBlockMixin",
-    "ClientPlayNetworkHandlerMixin"
+    "AbstractBlockMixin"
   ],
   "injectors": {
     "defaultRequire": 1

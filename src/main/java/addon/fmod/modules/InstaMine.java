@@ -20,7 +20,10 @@ public class InstaMine extends Module {
     }
 
     public void doInstaMine(BlockPos pos, Direction direction, CallbackInfoReturnable<Boolean> cir) {
-        if (mc.world == null || mc.player == null) return;
+        if (mc.world == null || mc.player == null) {
+            cir.setReturnValue(false);
+            return;
+        }
 
         // Check if this module (InstaMine) is active.
         if (this.isActive()) {
@@ -40,6 +43,9 @@ public class InstaMine extends Module {
                 // Set cir to true to indicate the block attack was handled (and potentially cancel further vanilla processing)
                 cir.setReturnValue(true);
             }
+        }
+        else{
+            cir.setReturnValue(false);
         }
     }
 }
