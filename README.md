@@ -8,7 +8,7 @@
 
 <!-- Fancy badges -->
 <div align="center">
-  <a href="https://gitlab.com/fluffysnaff/fmod/-/releases"><img src="https://img.shields.io/badge/Version-0.1.1-blue" alt="Version"></a>
+  <a href="https://github.com/fluffysnaff/fmod/-/releases"><img src="https://img.shields.io/badge/Version-0.1.1-blue" alt="Version"></a>
   <img src="https://img.shields.io/badge/Minecraft-1.21.5-green" alt="Minecraft Version">
   <img src="https://img.shields.io/badge/Meteor%20Client-Addon-purple" alt="Meteor Addon">
   <img src="https://img.shields.io/badge/spaghetti%20code-yes-success?logo=java" alt="Spagetti code: yes">
@@ -72,7 +72,7 @@ If you wish to build FMod from its source code:
 
 1.  **Clone the Repository**:
     ```bash
-    git clone https://gitlab.com/fluffysnaff/fmod.git
+    git clone https://github.com/fluffysnaff/fmod.git
     cd fmod
     ```
 2.  **Build the Project**:
