@@ -98,3 +98,7 @@ This project wouldn't be possible without the work and inspiration from others:
 *   **[JorianWoltjer/LiveOverflowMod](https://github.com/JorianWoltjer/LiveOverflowMod)**
 
 ---
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=fluffysnaff/fmod&type=Date)](https://www.star-history.com/#fluffysnaff/fmod&Date)
