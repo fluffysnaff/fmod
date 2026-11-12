@@ -1,13 +1,8 @@
 package addon.fmod.stashhunting;
 
 import meteordevelopment.meteorclient.utils.misc.input.Input;
-import meteordevelopment.meteorclient.utils.player.FindItemResult;
-import meteordevelopment.meteorclient.utils.player.InvUtils;
-import meteordevelopment.meteorclient.utils.player.SlotUtils;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
-import net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket;
-import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -17,46 +12,6 @@ import org.jetbrains.annotations.Nullable;
 
 public class Utils
 {
-
-    // returns -1 if fails, 200 if successful, and slot of chestplate if it had to swap (needed for mio grimdura)
-    public static int firework(Minecraft mc, boolean elytraRequired) {
-
-        // cant use a rocket if not wearing an elytra
-        int elytraSwapSlot = -1;
-        if (elytraRequired && !mc.player.getInventory().getItem(SlotUtils.ARMOR_START + 2).is(Items.ELYTRA))
-        {
-            FindItemResult itemResult = InvUtils.findInHotbar(Items.ELYTRA);
-            if (!itemResult.found()) {
-                return -1;
-            }
-            else
-            {
-                elytraSwapSlot = itemResult.slot();
-                InvUtils.swap(itemResult.slot(), true);
-                mc.gameMode.useItem(mc.player, InteractionHand.MAIN_HAND);
-                InvUtils.swapBack();
-                mc.getConnection().send(new ServerboundPlayerCommandPacket(mc.player, ServerboundPlayerCommandPacket.Action.START_FALL_FLYING));
-            }
-        }
-
-        FindItemResult itemResult = InvUtils.findInHotbar(Items.FIREWORK_ROCKET);
-        if (!itemResult.found()) return -1;
-
-        if (itemResult.isOffhand()) {
-            mc.gameMode.useItem(mc.player, InteractionHand.OFF_HAND);
-            meteordevelopment.meteorclient.utils.player.SwingMode.Client.interactSwing(InteractionHand.OFF_HAND);
-        } else {
-            InvUtils.swap(itemResult.slot(), true);
-            mc.gameMode.useItem(mc.player, InteractionHand.MAIN_HAND);
-            meteordevelopment.meteorclient.utils.player.SwingMode.Client.interactSwing(InteractionHand.MAIN_HAND);
-            InvUtils.swapBack();
-        }
-        if (elytraSwapSlot != -1)
-        {
-            return elytraSwapSlot;
-        }
-        return 200;
-    }
 
     public static void setPressed(KeyMapping key, boolean pressed)
     {

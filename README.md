@@ -16,6 +16,8 @@
 
 FMod is an addon for [Meteor Client](https://meteorclient.com/), a Minecraft client mod. All of its modules are in the **FMod** category of Meteor's menu.
 
+This branch contains the upcoming **0.3.0** changes. Build from source to use them; the v0.2.0 prerelease has the previous module set and Hide-only coordinate protection.
+
 ## Features
 
 <table>
@@ -24,8 +26,8 @@ FMod is an addon for [Meteor Client](https://meteorclient.com/), a Minecraft cli
 
 - **Find stashes.** Search Area moves you through a rectangle or a spiral. Better Stash Finder saves every chest it finds to CSV and JSON files.
 - **Follow trails.** Old Chunk Notifier tells you when you reach chunks from an older Minecraft version, where players were long ago. TrailFollower and Trail Maker follow a trail for you.
-- **Travel by elytra.** ElytraFlyPlusPlus passes highway obstacles. Pitch40Util and AFKVanillaFly keep you flying while you are away.
-- **Stream safely.** Coord Hider hides coordinates in F3, the Meteor HUD and chat. It changes only what is on your screen.
+- **Use Meteor flight while following trails.** TrailFollower can enable Meteor's built-in ElytraFly with your existing settings, and restores only the activation state it owns.
+- **Conceal coordinate displays.** Coord Hider can hide coordinates or show securely generated synthetic coordinates in F3, the Meteor HUD and recognised text. Actual movement and saved data stay unchanged.
 - **Get alerts.** Auto Log Plus logs you out in more situations. Discord Notifs sends messages to your own Discord webhook.
 - **Move with commands.** `.tp`, `.autoclip`, `.shclip` and `.dclip` teleport you short distances or through blocks.
 
@@ -33,7 +35,8 @@ FMod is an addon for [Meteor Client](https://meteorclient.com/), a Minecraft cli
 
 </td>
 <td valign="top" width="193">
-  <img src="docs/assets/readme/modules.png" width="193" alt="The FMod category in Meteor's module menu, with a list of its modules">
+  <img src="docs/assets/readme/modules.png" width="193" alt="The FMod category in Meteor's module menu, with the v0.2.0 module list">
+  <p><small>v0.2.0 menu; development modules have changed.</small></p>
 </td>
 </tr>
 </table>
@@ -44,7 +47,7 @@ FMod is an addon for [Meteor Client](https://meteorclient.com/), a Minecraft cli
 2. Download `fmod-<version>.jar` from the [v0.2.0 prerelease](https://github.com/fluffysnaff/fmod/releases/tag/v0.2.0) and put it in your `.minecraft/mods` folder.
 3. Start Minecraft with your Fabric profile. Press Right Shift to open Meteor's menu.
 
-The map and trail modules need Xaero's World Map, Xaero's Minimap and XaeroPlus. TrailFollower and ElytraFlyPlusPlus also need Baritone. Without these mods, the modules that need them do not appear. See the [tested versions](docs/FEATURES.md#optional-mods).
+The map and trail modules need Xaero's World Map, Xaero's Minimap and XaeroPlus. TrailFollower also needs Baritone. Without these mods, the modules that need them do not appear. See the [tested versions](docs/FEATURES.md#optional-mods).
 
 Many servers do not allow client mods. Read a server's rules before you use FMod on it.
 

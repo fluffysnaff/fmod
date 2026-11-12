@@ -7,7 +7,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin({DebugEntryPosition.class, DebugEntrySectionPosition.class, DebugEntryLookingAt.class,
+@Mixin({DebugEntrySectionPosition.class, DebugEntryLookingAt.class,
     DebugEntryLookingAtEntity.class, DebugEntryHeightmap.class, DebugEntryChunkGeneration.class})
 public abstract class DebugCoordinatesMixin {
     @Inject(method = "display", at = @At("HEAD"), cancellable = true)

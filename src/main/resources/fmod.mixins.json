@@ -4,14 +4,13 @@
   "compatibilityLevel": "JAVA_25",
   "client": [
     "DebugCoordinatesMixin",
+    "DebugPositionMixin",
     "MeteorCoordinateHudMixin",
     "MeteorCoordinateTextMixin",
     "VanillaCoordinateTextMixin",
     "AbstractBlockBlockStateMixin",
     "AbstractBlockMixin",
     "stashhunting.LivingEntityMixin",
-    "stashhunting.EntityMixin",
-    "stashhunting.KeyBindingMixin",
     "stashhunting.XaeroDrawingMixin"
   ],
   "injectors": {

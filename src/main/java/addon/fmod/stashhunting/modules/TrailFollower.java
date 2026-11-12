@@ -7,11 +7,15 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import addon.fmod.stashhunting.Utils;
 import meteordevelopment.meteorclient.events.render.Render3DEvent;
+import meteordevelopment.meteorclient.events.game.GameLeftEvent;
+import meteordevelopment.meteorclient.events.meteor.ActiveModulesChangedEvent;
 import meteordevelopment.meteorclient.events.world.TickEvent;
 import meteordevelopment.meteorclient.settings.*;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.systems.modules.Modules;
+import meteordevelopment.meteorclient.systems.modules.movement.elytrafly.ElytraFly;
 import meteordevelopment.meteorclient.utils.player.Rotations;
+import meteordevelopment.meteorclient.utils.misc.input.Input;
 import meteordevelopment.meteorclient.utils.render.color.Color;
 import meteordevelopment.meteorclient.utils.player.FindItemResult;
 import meteordevelopment.meteorclient.utils.player.InvUtils;
@@ -80,22 +84,19 @@ public class TrailFollower extends Module
         .build()
     );
 
-    // changed to an enum dropdown for fly selection
-    public enum OverworldFlightMode {
-        VANILLA,
-        PITCH40,
-        OTHER
-    }
-
     public enum NetherPathMode {
         AVERAGE,
         OTHER
     }
 
-    public final Setting<OverworldFlightMode> overworldFlightMode = sgGeneral.add(new EnumSetting.Builder<OverworldFlightMode>()
-        .name("overworld-flight-mode")
-        .description("Choose how TrailFollower flies in Overworld. If other is selected then nothing will be automatically enabled, instead just your yaw will be changed to point towards the trail.")
-        .defaultValue(OverworldFlightMode.PITCH40)
+    public final Setting<Boolean> meteorElytraFly = sgGeneral.add(new BoolSetting.Builder()
+        .name("meteor-elytra-fly")
+        .description("Enables Meteor's ElytraFly for yaw following, using its existing settings. Restores it only if TrailFollower enabled it.")
+        .defaultValue(true)
+        .onChanged(enabled -> {
+            if (!enabled) releaseFlight();
+            else if (isActive() && this.started) startFlight();
+        })
         .build()
     );
 
@@ -103,14 +104,6 @@ public class TrailFollower extends Module
         .name("nether-path-mode")
         .description("Choose how TrailFollower does baritone pathing in Nether. If other is selected then nothing will be automatically enabled, instead just your yaw will be changed to point towards the trail.")
         .defaultValue(NetherPathMode.AVERAGE)
-        .build()
-    );
-
-    public final Setting<Boolean> pitch40Firework = sgGeneral.add(new BoolSetting.Builder()
-        .name("auto-firework")
-        .description("Uses a firework automatically if your velocity is too low.")
-        .defaultValue(true)
-        .visible(() -> overworldFlightMode.get() == OverworldFlightMode.PITCH40)
         .build()
     );
 
@@ -255,7 +248,6 @@ public class TrailFollower extends Module
 
     // TODO: Auto disconnect at certain chunk load speed
 
-    private boolean oldAutoFireworkValue;
 
     private FollowMode followMode;
 
@@ -291,98 +283,84 @@ public class TrailFollower extends Module
 
     boolean started = false;
 
+    private ElytraFly managedFlight;
+    private boolean forwardHeld;
+
     @Override
-    public void onActivate()
-    {
+    public void onActivate() {
         resetTrail();
+        started = false;
+        followMode = null;
         XaeroPlus.EVENT_BUS.register(this);
+        startFollowing();
+    }
 
-        if (started)
-        {
-            if (mc.player != null && mc.level != null)
-            {
-                ResourceKey<Level> currentDimension = mc.level.dimension();
-                if (oppositeDimension.get())
-                {
-                    if (currentDimension.equals(Level.END))
-                    {
-                        info("There is no opposite dimension to the end. Disabling TrailFollower");
-                        this.toggle();
-                        return;
-                    }
-                    else if (currentDimension.equals(Level.NETHER))
-                    {
-                        info("Following overworld trails from the nether is not supported yet, sorry. Disabling TrailFollower");
-                        this.toggle();
-                        return;
-                    }
-                }
-                if (flightMethod.get() != FollowMode.AUTO)
-                {
-                    followMode = flightMethod.get();
-                }
-                else
-                {
-                    if (!currentDimension.equals(Level.NETHER))
-                    {
-                        followMode = FollowMode.YAWLOCK;
-                        info("You are in the overworld or end, basic yaw mode will be used.");
-                    }
-                    else
-                    {
-                        try {
-                            Class.forName("baritone.api.BaritoneAPI");
-                            followMode = FollowMode.BARITONE;
-                            info("You are in the nether, baritone mode will be used.");
-                        } catch (ClassNotFoundException e) {
-                            info("Baritone is required to trail follow in the nether. Disabling TrailFollower");
-                            this.toggle();
-                            return;
-                        }
-                    }
-                }
-
-                if (followMode == FollowMode.YAWLOCK && !mc.level.dimension().equals(Level.NETHER)) {
-                    if (overworldFlightMode.get() == OverworldFlightMode.PITCH40) {
-                        Class<? extends Module> pitch40Util = Pitch40Util.class;
-                        Module pitch40UtilModule = Modules.get().get(pitch40Util);
-                        if (!pitch40UtilModule.isActive()) {
-                            pitch40UtilModule.toggle();
-                            if (pitch40Firework.get()) {
-                                Setting<Boolean> setting = ((Setting<Boolean>) pitch40UtilModule.settings.get("auto-firework"));
-                                info("Auto Firework enabled, if you want to change the velocity threshold or the firework cooldown check the settings under Pitch40Util.");
-                                oldAutoFireworkValue = setting.get();
-                                setting.set(true);
-                            }
-                        }
-                    } else if (overworldFlightMode.get() == OverworldFlightMode.VANILLA) {
-                        AFKVanillaFly afkVanillaFly = Modules.get().get(AFKVanillaFly.class);
-                        if (!afkVanillaFly.isActive()) {
-                            afkVanillaFly.toggle();
-                        }
-                    }
-                }
-                // set original pos to pathDistance blocks in the direction the player is facing
-                Vec3 offset = (new Vec3(Math.sin(-mc.player.getYRot() * Math.PI / 180), 0, Math.cos(-mc.player.getYRot() * Math.PI / 180)).normalize()).scale(pathDistance.get());
-                Vec3 targetPos = mc.player.position().add(offset);
-                for (int i = 0; i < (maxTrailLength.get() * startDirectionWeighting.get()); i++)
-                {
-                    trail.add(targetPos);
-                }
-                targetYaw = getActualYaw(mc.player.getYRot());
-            }
-            else
-            {
-                this.toggle();
-            }
-            started = true;
+    private void startFollowing() {
+        if (mc.player == null || mc.level == null) return;
+        ResourceKey<Level> dimension = mc.level.dimension();
+        if (oppositeDimension.get() && (dimension.equals(Level.END) || dimension.equals(Level.NETHER))) {
+            info("Opposite-dimension following is supported from the overworld only. Disabling TrailFollower.");
+            toggle();
+            return;
         }
+        followMode = flightMethod.get() == FollowMode.AUTO
+            ? (dimension.equals(Level.NETHER) ? FollowMode.BARITONE : FollowMode.YAWLOCK)
+            : flightMethod.get();
+        Vec3 offset = new Vec3(Math.sin(-mc.player.getYRot() * Math.PI / 180), 0,
+            Math.cos(-mc.player.getYRot() * Math.PI / 180)).normalize().scale(pathDistance.get());
+        Vec3 target = mc.player.position().add(offset);
+        for (int i = 0; i < maxTrailLength.get() * startDirectionWeighting.get(); i++) trail.add(target);
+        targetYaw = getActualYaw(mc.player.getYRot());
+        started = true;
+        startFlight();
+    }
+
+    private void startFlight() {
+        if (!meteorElytraFly.get() || followMode != FollowMode.YAWLOCK || managedFlight != null) return;
+        ElytraFly flight = Modules.get().get(ElytraFly.class);
+        if (flight != null && !flight.isActive()) {
+            flight.toggle();
+            if (flight.isActive()) managedFlight = flight;
+        }
+    }
+
+    private void releaseFlight() {
+        setForward(false);
+        ElytraFly flight = managedFlight;
+        managedFlight = null;
+        if (flight != null && flight.isActive()) flight.toggle();
+    }
+
+    @EventHandler
+    private void onActiveModulesChanged(ActiveModulesChangedEvent event) {
+        // Manual disable relinquishes ownership, including a subsequent manual re-enable.
+        if (managedFlight != null && !managedFlight.isActive()) managedFlight = null;
+        if (forwardHeld && !Modules.get().isActive(ElytraFly.class)) setForward(false);
+    }
+
+    private void setForward(boolean pressed) {
+        if (pressed) {
+            // Leave Meteor's physical input state untouched so it can be restored on release.
+            mc.options.keyUp.setDown(true);
+            forwardHeld = true;
+        } else if (forwardHeld) {
+            forwardHeld = false;
+            mc.options.keyUp.setDown(Input.isPressed(mc.options.keyUp));
+        }
+    }
+
+    @EventHandler
+    private void onGameLeft(GameLeftEvent event) {
+        started = false;
+        releaseFlight();
+        resetTrail();
     }
 
     @Override
     public void onDeactivate()
     {
         started = false;
+        releaseFlight();
         // do this at the end to free memory
         seenChunksCache = Caffeine.newBuilder()
             .maximumSize(chunkCacheLength.get())
@@ -400,21 +378,7 @@ public class TrailFollower extends Module
                 break;
             }
             case YAWLOCK: {
-                if (mc.level == null || mc.level.dimension().equals(Level.NETHER)) return;
-                if (overworldFlightMode.get() == OverworldFlightMode.VANILLA) {
-                    AFKVanillaFly afkVanillaFly = Modules.get().get(AFKVanillaFly.class);
-                    if (afkVanillaFly != null) {
-                        afkVanillaFly.resetYLock();
-                        if (afkVanillaFly.isActive()) afkVanillaFly.toggle();
-                    }
-                } else if (overworldFlightMode.get() == OverworldFlightMode.PITCH40) {
-                    Class<? extends Module> pitch40Util = Pitch40Util.class;
-                    Module pitch40UtilModule = Modules.get().get(pitch40Util);
-                    if (pitch40UtilModule.isActive()) {
-                        pitch40UtilModule.toggle();
-                    }
-                    ((Setting<Boolean>) pitch40UtilModule.settings.get("auto-firework")).set(oldAutoFireworkValue);
-                }
+                // Movement and flight are controlled by the user's selected movement module.
                 break;
             }
         }
@@ -437,12 +401,11 @@ public class TrailFollower extends Module
     @EventHandler
     private void onTick(TickEvent.Post event)
     {
-        if (!started)
-        {
-            started = true;
-            onActivate();
-        }
-        if (mc.player == null || mc.level == null) return;
+        if (mc.player == null || mc.level == null) { setForward(false); return; }
+        if (!started) startFollowing();
+        if (!started || !isActive()) return;
+        setForward(meteorElytraFly.get() && followMode == FollowMode.YAWLOCK
+            && Modules.get().isActive(ElytraFly.class) && mc.player.isFallFlying() && mc.gui.screen() == null);
         if (followingTrail && System.currentTimeMillis() - lastFoundTrailTime > trailTimeout.get())
         {
             resetTrail();
@@ -452,7 +415,7 @@ public class TrailFollower extends Module
                 case DISABLE:
                 {
                     this.toggle();
-                    break;
+                    return;
                 }
                 case FLY_TOWARDS_YAW:
                 {
@@ -462,7 +425,7 @@ public class TrailFollower extends Module
                 case DISCONNECT:
                 {
                     mc.player.connection.handleDisconnect(new ClientboundDisconnectPacket(Component.literal("[TrailFollower] Trail timed out.")));
-                    break;
+                    return;
                 }
             }
         }
