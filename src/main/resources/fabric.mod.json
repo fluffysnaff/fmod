@@ -13,7 +13,7 @@
     "sources": "https://github.com/fluffysnaff/fmod",
     "issues": "https://github.com/fluffysnaff/fmod/issues"
   },
-  "icon": "assets/template/icon.PNG",
+  "icon": "assets/fmod/icon.png",
   "environment": "client",
   "entrypoints": {
     "meteor": [

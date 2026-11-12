@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="512" height="512" shape-rendering="crispEdges">
+  <title>FMod</title>
+  <rect width="16" height="16" rx="2.5" fill="#11151c"/>
+  <rect x="0.2" y="0.2" width="15.6" height="15.6" rx="2.3" fill="none" stroke="#2a3344" stroke-width="0.4" shape-rendering="geometricPrecision"/>
+  <g fill="#6e0b0b">
+    <rect x="4" y="4" width="3" height="10"/>
+    <rect x="4" y="4" width="10" height="3"/>
+    <rect x="4" y="9" width="7" height="2"/>
+  </g>
+  <g fill="#e11919">
+    <rect x="3" y="3" width="3" height="10"/>
+    <rect x="3" y="3" width="10" height="3"/>
+    <rect x="3" y="8" width="7" height="2"/>
+  </g>
+  <g fill="#ff5a4a">
+    <rect x="3" y="3" width="10" height="1"/>
+    <rect x="3" y="3" width="1" height="10"/>
+    <rect x="3" y="8" width="7" height="1"/>
+  </g>
+  <g fill="#b07cff">
+    <rect x="12" y="10" width="1" height="3"/>
+    <rect x="11" y="11" width="3" height="1"/>
+  </g>
+  <rect x="12" y="11" width="1" height="1" fill="#e6d6ff"/>
+</svg>
