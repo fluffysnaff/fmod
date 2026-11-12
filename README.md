@@ -8,8 +8,8 @@
 
 <!-- Fancy badges -->
 <div align="center">
-  <a href="https://gitlab.com/fluffysnaff/fmod/-/releases"><img src="https://img.shields.io/badge/Version-0.1.1-blue" alt="Version"></a>
-  <img src="https://img.shields.io/badge/Minecraft-1.21.5-green" alt="Minecraft Version">
+  <a href="https://gitlab.com/fluffysnaff/fmod/-/releases"><img src="https://img.shields.io/badge/Version-0.1.2-blue" alt="Version"></a>
+  <img src="https://img.shields.io/badge/Minecraft-26.3-green" alt="Minecraft Version">
   <img src="https://img.shields.io/badge/Meteor%20Client-Addon-purple" alt="Meteor Addon">
   <img src="https://img.shields.io/badge/spaghetti%20code-yes-success?logo=java" alt="Spagetti code: yes">
 </div>
@@ -58,17 +58,17 @@ Commands are prefixed with a `.` (dot), Meteor Client's default command prefix.
 
 ## 🚀 How to Use
 
-1.  **Install Meteor Client**: If you haven't already, download and install [Meteor Client](https://meteorclient.com/download) for your Minecraft version (e.g., 1.21.5). Make sure you also have the Fabric Loader and Fabric API.
+1.  **Install Meteor Client**: If you haven't already, download and install [Meteor Client](https://meteorclient.com/download) for Minecraft 26.3. Use Java 25 or newer and Fabric Loader 0.19.5 or newer. Meteor bundles the Fabric API components it needs.
 2.  **Download FMod**:
     *   It's only possible now to build it yourself from the source code(see below).
-3.  **Install FMod**: Place the downloaded `fmod-[version].jar` file into your `.minecraft/mods/` folder. This folder should also contain your Meteor Client jar and Fabric API jar.
+3.  **Install FMod**: Place the downloaded `fmod-[version].jar` file into your `.minecraft/mods/` folder. This folder should also contain your Meteor Client 26.3 jar.
 4.  **Launch Minecraft**: Start Minecraft using the Fabric loader profile from your Minecraft launcher. FMod will load automatically as an addon to Meteor Client.
 
 ---
 
 ## 🛠️ Building from Source (Optional)
 
-If you wish to build FMod from its source code:
+Building requires a JDK 25 installation. Set `JAVA_HOME` to that JDK, then use the included Gradle 9.8.1 wrapper. The project targets Minecraft 26.3 and Meteor Client `26.3-SNAPSHOT` using Mojang names (no Yarn mappings).
 
 1.  **Clone the Repository**:
     ```bash
@@ -79,13 +79,13 @@ If you wish to build FMod from its source code:
     Use Gradle Wrapper to build the project.
     *   On Windows:
         ```bash
-        gradlew build
+        .\gradlew.bat build
         ```
     *   On macOS/Linux:
         ```bash
-        ./gradlew build
+        bash ./gradlew build
         ```
-3.  **Locate the Jar**: The compiled `.jar` file (e.g., `fmod-0.1.1.jar`) will be located in the `build/libs/` directory. You can then use this jar as described in the "How to Use" section.
+3.  **Locate the Jar**: The compiled `.jar` file (e.g., `fmod-0.1.2.jar`) will be located in the `build/libs/` directory. You can then use this jar as described in the "How to Use" section.
 
 ---
 

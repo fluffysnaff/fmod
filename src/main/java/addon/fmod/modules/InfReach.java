@@ -10,20 +10,21 @@ import meteordevelopment.meteorclient.settings.*;
 import meteordevelopment.meteorclient.systems.friends.Friends;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.utils.player.PlayerUtils;
+import meteordevelopment.meteorclient.utils.player.SwingMode;
 import meteordevelopment.meteorclient.utils.render.color.Color;
 import meteordevelopment.meteorclient.utils.render.color.SettingColor;
 import meteordevelopment.orbit.EventHandler;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.network.packet.c2s.play.ClientCommandC2SPacket;
-import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
-import net.minecraft.network.packet.c2s.play.VehicleMoveC2SPacket;
-import net.minecraft.util.Hand;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.GameMode;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket;
+import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
+import net.minecraft.network.protocol.game.ServerboundMoveVehiclePacket;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.level.GameType;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -86,12 +87,12 @@ public class InfReach extends Module {
         return closestEntity;
     }
 
-    private final HashSet<PlayerMoveC2SPacket> packets = new HashSet<>();
+    private final HashSet<ServerboundMovePlayerPacket> packets = new HashSet<>();
     @EventHandler
     public void onPacketSend(PacketEvent.Send event)
     {
         if(packets.isEmpty()) return;
-        if ((event.packet instanceof PlayerMoveC2SPacket) && !packets.remove(event.packet)) event.cancel();
+        if ((event.packet instanceof ServerboundMovePlayerPacket) && !packets.remove(event.packet)) event.cancel();
     }
 
     @Override
@@ -101,29 +102,29 @@ public class InfReach extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Post event) {
-        if (mc.player == null || mc.world == null) {
+        if (mc.player == null || mc.level == null) {
             closestEntity = null;
             return;
         }
 
-        if (!mc.player.isAlive() || PlayerUtils.getGameMode() == GameMode.SPECTATOR) return;
+        if (!mc.player.isAlive() || PlayerUtils.getGameMode() == GameType.SPECTATOR) return;
 
-        Vec3d origin = mc.player.getCameraPosVec(1.0F);
-        Vec3d direction = mc.player.getRotationVec(1.0F).normalize();
+        Vec3 origin = mc.player.getEyePosition(1.0F);
+        Vec3 direction = mc.player.getViewVector(1.0F).normalize();
         double maxDistance = range.get();
         double maxAngleThreshold = Math.toRadians(fov.get());
 
         Entity currentClosest = null;
         double closestAngle = Double.MAX_VALUE;
 
-        for (Entity entity : mc.world.getEntities()) {
+        for (Entity entity : mc.level.entitiesForRendering()) {
             if (entity == null || !canAttack(entity)) continue;
 
-            Vec3d toEntity = entity.getPos().add(0, entity.getHeight() / 2.0, 0).subtract(origin);
+            Vec3 toEntity = entity.position().add(0, entity.getBbHeight() / 2.0, 0).subtract(origin);
             double distance = toEntity.length();
             if (distance > maxDistance) continue;
 
-            double angle = Math.acos(direction.dotProduct(toEntity.normalize()));
+            double angle = Math.acos(direction.dot(toEntity.normalize()));
             if (angle < closestAngle && angle <= maxAngleThreshold) {
                 currentClosest = entity;
                 closestAngle = angle;
@@ -132,7 +133,7 @@ public class InfReach extends Module {
         closestEntity = currentClosest;
 
         if (closestEntity == null) return;
-        if (!mc.options.attackKey.isPressed()) return;
+        if (!mc.options.keyAttack.isDown()) return;
 
         hitEntity(closestEntity);
     }
@@ -141,15 +142,15 @@ public class InfReach extends Module {
     private void onRender3d(Render3DEvent event) {
         if (closestEntity == null) return;
 
-        Box box = closestEntity.getBoundingBox();
-        Vec3d center = box.getCenter();
+        AABB box = closestEntity.getBoundingBox();
+        Vec3 center = box.getCenter();
         double scaleFactor = scale.get();
 
-        double halfLengthX = (box.getLengthX() * scaleFactor) / 2.0;
-        double halfLengthY = (box.getLengthY() * scaleFactor) / 2.0;
-        double halfLengthZ = (box.getLengthZ() * scaleFactor) / 2.0;
+        double halfLengthX = (box.getXsize() * scaleFactor) / 2.0;
+        double halfLengthY = (box.getYsize() * scaleFactor) / 2.0;
+        double halfLengthZ = (box.getZsize() * scaleFactor) / 2.0;
 
-        Box scaledBox = new Box(
+        AABB scaledBox = new AABB(
             center.x - halfLengthX, center.y - halfLengthY, center.z - halfLengthZ,
             center.x + halfLengthX, center.y + halfLengthY, center.z + halfLengthZ
         );
@@ -158,12 +159,12 @@ public class InfReach extends Module {
     }
 
     private boolean canAttack(Entity entity) {
-        if (entity.equals(mc.player) || entity.equals(mc.cameraEntity)) return false;
-        if ((entity instanceof LivingEntity && ((LivingEntity) entity).isDead()) || !entity.isAlive()) return false;
+        if (entity.equals(mc.player) || entity.equals(mc.getCameraEntity())) return false;
+        if ((entity instanceof LivingEntity && ((LivingEntity) entity).isDeadOrDying()) || !entity.isAlive()) return false;
         if (!PlayerUtils.isWithin(entity, range.get())) return false;
         if (!entities.get().contains(entity.getType())) return false;
 
-        if (entity instanceof PlayerEntity player) {
+        if (entity instanceof Player player) {
             if (player.isCreative()) return false;
             if (!Friends.get().shouldAttack(player)) return false;
         }
@@ -171,46 +172,46 @@ public class InfReach extends Module {
     }
 
     private void hitEntity(Entity target) {
-        if (mc.interactionManager == null || mc.player == null || target == null) return;
+        if (mc.gameMode == null || mc.player == null || target == null) return;
 
-        Vec3d startPos = mc.player.getPos();
-        Vec3d targetPos = target.getPos().subtract(  // Subtract a bit from the end
-            target.getPos().subtract(startPos).normalize().multiply(2)
+        Vec3 startPos = mc.player.position();
+        Vec3 targetPos = target.position().subtract(  // Subtract a bit from the end
+            target.position().subtract(startPos).normalize().scale(2)
         );
 
-        mc.player.networkHandler.sendPacket(new ClientCommandC2SPacket(mc.player, ClientCommandC2SPacket.Mode.START_FALL_FLYING));
+        mc.player.connection.send(new ServerboundPlayerCommandPacket(mc.player, ServerboundPlayerCommandPacket.Action.START_FALL_FLYING));
 
         // Exploit
         warpTo(targetPos);
 
         // Attack
-        mc.interactionManager.attackEntity(mc.player, target);
-        mc.player.swingHand(Hand.MAIN_HAND);
+        mc.gameMode.attack(mc.player, target);
+        SwingMode.Both.attackSwing(InteractionHand.MAIN_HAND);
 
         // Go back
-        PlayerMoveC2SPacket movePacket = new PlayerMoveC2SPacket.PositionAndOnGround(startPos.x, startPos.y, startPos.z, true, mc.player.horizontalCollision);
+        ServerboundMovePlayerPacket movePacket = new ServerboundMovePlayerPacket.Pos(startPos.x, startPos.y, startPos.z, true, mc.player.horizontalCollision);
         packets.add(movePacket);
-        mc.player.networkHandler.sendPacket(movePacket);
-        mc.player.setPosition(startPos);
+        mc.player.connection.send(movePacket);
+        mc.player.setPos(startPos);
     }
 
-    public void warpTo(Vec3d pos) {
+    public void warpTo(Vec3 pos) {
         if (mc.player == null) return;
 
-        Vec3d newPos = new Vec3d(pos.getX() + 0.5, pos.getY() + 1, pos.getZ() + 0.5);
-        int packetsRequired = (int) Math.ceil(mc.player.getPos().distanceTo(newPos) / 10) - 1;
+        Vec3 newPos = new Vec3(pos.x + 0.5, pos.y + 1, pos.z + 0.5);
+        int packetsRequired = (int) Math.ceil(mc.player.position().distanceTo(newPos) / 10) - 1;
 
         // Exploit
         for (int packetNumber = 0; packetNumber < (packetsRequired); packetNumber++) {
-            PlayerMoveC2SPacket movePacket = new PlayerMoveC2SPacket.OnGroundOnly(true, mc.player.horizontalCollision);
+            ServerboundMovePlayerPacket movePacket = new ServerboundMovePlayerPacket.StatusOnly(true, mc.player.horizontalCollision);
             packets.add(movePacket);
-            mc.player.networkHandler.sendPacket(movePacket);
+            mc.player.connection.send(movePacket);
         }
 
         // Tp to pos
-        PlayerMoveC2SPacket movePacket = new PlayerMoveC2SPacket.PositionAndOnGround(newPos.x, newPos.y, newPos.z, true, mc.player.horizontalCollision);
+        ServerboundMovePlayerPacket movePacket = new ServerboundMovePlayerPacket.Pos(newPos.x, newPos.y, newPos.z, true, mc.player.horizontalCollision);
         packets.add(movePacket);
-        mc.player.networkHandler.sendPacket(movePacket);
-        mc.player.setPosition(newPos);
+        mc.player.connection.send(movePacket);
+        mc.player.setPos(newPos);
     }
 }

@@ -7,11 +7,11 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.exceptions.DynamicCommandExceptionType;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
-import net.minecraft.command.CommandSource;
-import net.minecraft.server.command.CommandManager;
-import net.minecraft.text.Text;
-import net.minecraft.util.Pair;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.commands.SharedSuggestionProvider;
+import net.minecraft.commands.Commands;
+import net.minecraft.network.chat.Component;
+import com.mojang.datafixers.util.Pair;
+import net.minecraft.core.BlockPos;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -22,8 +22,8 @@ import static meteordevelopment.meteorclient.MeteorClient.mc;
 public class BlockPosArgumentType implements ArgumentType<BlockPos> {
     private static final Collection<String> EXAMPLES = Arrays.asList("0 0 0", "~ ~ ~", "~2 ~1 ~-5");
 
-    private static final DynamicCommandExceptionType MISSING_COORDINATE = new DynamicCommandExceptionType(object -> Text.literal("Command is incomplete missing 1 or more coordinates."));
-    private static final DynamicCommandExceptionType INCOMPLETE_EXCEPTION = new DynamicCommandExceptionType(object -> Text.literal("Incomplete position argument."));
+    private static final DynamicCommandExceptionType MISSING_COORDINATE = new DynamicCommandExceptionType(object -> Component.literal("Command is incomplete missing 1 or more coordinates."));
+    private static final DynamicCommandExceptionType INCOMPLETE_EXCEPTION = new DynamicCommandExceptionType(object -> Component.literal("Incomplete position argument."));
 
     public static BlockPosArgumentType pos() {
         return new BlockPosArgumentType();
@@ -38,10 +38,10 @@ public class BlockPosArgumentType implements ArgumentType<BlockPos> {
     }
 
     public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> context, SuggestionsBuilder builder) {
-        if (!(context.getSource() instanceof CommandSource)) {
+        if (!(context.getSource() instanceof SharedSuggestionProvider)) {
             return Suggestions.empty();
         } else {
-            return CommandSource.suggestPositions(builder.getRemaining(), ((CommandSource) context.getSource()).getBlockPositionSuggestions(), builder, CommandManager.getCommandValidator(this::parse));
+            return SharedSuggestionProvider.suggestCoordinates(builder.getRemaining(), ((SharedSuggestionProvider) context.getSource()).getRelevantCoordinates(), builder, Commands.createValidator(this::parse));
         }
     }
 
@@ -68,9 +68,9 @@ public class BlockPosArgumentType implements ArgumentType<BlockPos> {
                 Pair<Boolean, Integer> z = parseCoordinate(reader);
 
                 return new BlockPos(
-                    x.getLeft() ? (int)x.getRight() + (int)mc.player.getX() : (int)x.getRight(),
-                    y.getLeft() ? (int)y.getRight() + (int)mc.player.getY() : (int)y.getRight(),
-                    z.getLeft() ? (int)z.getRight() + (int)mc.player.getZ() : (int)z.getRight()
+                    x.getFirst() ? (int)x.getSecond() + (int)mc.player.getX() : (int)x.getSecond(),
+                    y.getFirst() ? (int)y.getSecond() + (int)mc.player.getY() : (int)y.getSecond(),
+                    z.getFirst() ? (int)z.getSecond() + (int)mc.player.getZ() : (int)z.getSecond()
                 );
             } else {
                 reader.setCursor(cursor);
@@ -97,9 +97,9 @@ public class BlockPosArgumentType implements ArgumentType<BlockPos> {
             String string = reader.getString().substring(cursor, reader.getCursor());
 
             if (relative && string.isEmpty()) {
-                return new Pair<>(true, 0);
+                return Pair.of(true, 0);
             } else {
-                return new Pair<>(relative, value);
+                return Pair.of(relative, value);
             }
         }
     }

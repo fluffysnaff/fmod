@@ -1,5 +1,5 @@
 plugins {
-    id("fabric-loom") version "1.10-SNAPSHOT"
+    id("net.fabricmc.fabric-loom") version "1.18-SNAPSHOT"
 }
 
 base {
@@ -22,11 +22,14 @@ repositories {
 dependencies {
     // Fabric
     minecraft("com.mojang:minecraft:${properties["minecraft_version"] as String}")
-    mappings("net.fabricmc:yarn:${properties["yarn_mappings"] as String}:v2")
-    modImplementation("net.fabricmc:fabric-loader:${properties["loader_version"] as String}")
+    implementation("net.fabricmc:fabric-loader:${properties["loader_version"] as String}")
 
     // Meteor
-    modImplementation("meteordevelopment:meteor-client:${properties["minecraft_version"] as String}-SNAPSHOT")
+    implementation("meteordevelopment:meteor-client:${properties["meteor_version"] as String}")
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of((properties["java_version"] as String).toInt())
 }
 
 tasks {
@@ -34,6 +37,8 @@ tasks {
         val propertyMap = mapOf(
             "version" to project.version,
             "mc_version" to project.property("minecraft_version"),
+            "loader_version" to project.property("loader_version"),
+            "java_version" to project.property("java_version"),
         )
 
         inputs.properties(propertyMap)
@@ -52,13 +57,8 @@ tasks {
         }
     }
 
-    java {
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
-    }
-
     withType<JavaCompile> {
         options.encoding = "UTF-8"
-        options.release = 21
+        options.release = (project.property("java_version") as String).toInt()
     }
 }

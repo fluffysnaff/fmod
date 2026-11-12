@@ -8,10 +8,11 @@ import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.utils.player.InvUtils;
 // import meteordevelopment.meteorclient.utils.player.FindItemResult; // Not directly used but good to keep if InvUtils.findInHotbar is used elsewhere
 import meteordevelopment.orbit.EventHandler;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.decoration.ItemFrameEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.Hand;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.decoration.ItemFrame;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.phys.EntityHitResult;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -75,9 +76,9 @@ public class FrameDupe extends Module {
     private ItemStack savedInitialStack;
     private boolean savedItemWasNonStackable;
 
-    private final List<ItemFrameEntity> itemFrames = new ArrayList<>();
+    private final List<ItemFrame> itemFrames = new ArrayList<>();
     private int currentFrameIndex;
-    private ItemFrameEntity currentTargetFrame;
+    private ItemFrame currentTargetFrame;
 
     private enum State {
         IDLE,
@@ -100,25 +101,25 @@ public class FrameDupe extends Module {
 
     @Override
     public void onActivate() {
-        if (mc.player == null || mc.interactionManager == null) {
+        if (mc.player == null || mc.gameMode == null) {
             error("Player or InteractionManager not available.");
             toggle();
             return;
         }
-        savedInitialStack = mc.player.getMainHandStack().copy(); // Make a copy
+        savedInitialStack = mc.player.getMainHandItem().copy(); // Make a copy
         if (savedInitialStack.isEmpty()) {
             error("Cannot activate with an empty hand.");
             toggle();
             return;
         }
-        savedItemWasNonStackable = savedInitialStack.getMaxCount() == 1;
+        savedItemWasNonStackable = savedInitialStack.getMaxStackSize() == 1;
 
         currentState = State.SEARCHING_FRAMES;
         itemFrames.clear();
         currentFrameIndex = -1;
         currentTargetFrame = null;
         timer = 0;
-        info("Activated. Initial item: %s (Non-stackable: %b)", savedInitialStack.getName().getString(), savedItemWasNonStackable);
+        info("Activated. Initial item: %s (Non-stackable: %b)", savedInitialStack.getHoverName().getString(), savedItemWasNonStackable);
     }
 
     @Override
@@ -135,7 +136,7 @@ public class FrameDupe extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Post event) {
-        if (mc.player == null || mc.world == null || mc.interactionManager == null || savedInitialStack == null) {
+        if (mc.player == null || mc.level == null || mc.gameMode == null || savedInitialStack == null) {
             if (isActive()) toggle();
             return;
         }
@@ -148,14 +149,14 @@ public class FrameDupe extends Module {
         switch (currentState) {
             case SEARCHING_FRAMES:
                 itemFrames.clear();
-                for (Entity entity : mc.world.getEntities()) {
-                    if (entity instanceof ItemFrameEntity itemFrameEntity && isTargetValid(itemFrameEntity)) {
+                for (Entity entity : mc.level.entitiesForRendering()) {
+                    if (entity instanceof ItemFrame itemFrameEntity && isTargetValid(itemFrameEntity)) {
                         itemFrames.add(itemFrameEntity);
                     }
                 }
 
                 if (sortFrames.get()) {
-                    itemFrames.sort(Comparator.comparingDouble(e -> mc.player.squaredDistanceTo(e)));
+                    itemFrames.sort(Comparator.comparingDouble(e -> mc.player.distanceToSqr(e)));
                 }
                 currentFrameIndex = 0;
 
@@ -176,16 +177,16 @@ public class FrameDupe extends Module {
                 }
 
                 if (savedItemWasNonStackable) {
-                    ItemStack currentMainHand = mc.player.getMainHandStack();
+                    ItemStack currentMainHand = mc.player.getMainHandItem();
                     // Use areItemsAndComponentsEqual for proper comparison in 1.20.2+
-                    boolean holdingSavedItemInMainHand = ItemStack.areItemsAndComponentsEqual(currentMainHand, savedInitialStack);
+                    boolean holdingSavedItemInMainHand = ItemStack.isSameItemSameComponents(currentMainHand, savedInitialStack);
 
                     if (!holdingSavedItemInMainHand) {
                         int hotbarSlotToSwitch = -1;
                         for (int i = 0; i < 9; i++) {
-                            ItemStack hotbarStack = mc.player.getInventory().getStack(i);
+                            ItemStack hotbarStack = mc.player.getInventory().getItem(i);
                             // Use areItemsAndComponentsEqual here as well
-                            if (ItemStack.areItemsAndComponentsEqual(hotbarStack, savedInitialStack)) {
+                            if (ItemStack.isSameItemSameComponents(hotbarStack, savedInitialStack)) {
                                 hotbarSlotToSwitch = i;
                                 break;
                             }
@@ -201,7 +202,7 @@ public class FrameDupe extends Module {
                                 timer = delayBeforeRightClick.get();
                             }
                         } else {
-                            error("Saved non-stackable item '%s' not found in hotbar. Skipping frame.", savedInitialStack.getName().getString());
+                            error("Saved non-stackable item '%s' not found in hotbar. Skipping frame.", savedInitialStack.getHoverName().getString());
                             advanceToNextFrameOrRescan();
                         }
                         break;
@@ -233,7 +234,7 @@ public class FrameDupe extends Module {
                     advanceToNextFrameOrRescan();
                     break;
                 }
-                mc.interactionManager.interactEntity(mc.player, currentTargetFrame, Hand.MAIN_HAND);
+                mc.gameMode.interact(mc.player, currentTargetFrame, new EntityHitResult(currentTargetFrame), InteractionHand.MAIN_HAND);
                 currentState = State.PRE_LEFT_CLICK_DELAY;
                 timer = delayBeforeLeftClick.get();
                 break;
@@ -251,7 +252,7 @@ public class FrameDupe extends Module {
                     advanceToNextFrameOrRescan();
                     break;
                 }
-                mc.interactionManager.attackEntity(mc.player, currentTargetFrame);
+                mc.gameMode.attack(mc.player, currentTargetFrame);
                 advanceToNextFrameOrRescan();
                 break;
 
@@ -269,15 +270,15 @@ public class FrameDupe extends Module {
         }
     }
 
-    private boolean isTargetValid(ItemFrameEntity entity) {
+    private boolean isTargetValid(ItemFrame entity) {
         if (entity == null || !entity.isAlive()) return false;
-        return mc.player.getEyePos().distanceTo(entity.getPos()) <= range.get();
+        return mc.player.getEyePosition().distanceTo(entity.position()) <= range.get();
     }
 
     private void setupNextTargetFrame() {
         currentTargetFrame = null;
         while (currentFrameIndex < itemFrames.size()) {
-            ItemFrameEntity frame = itemFrames.get(currentFrameIndex);
+            ItemFrame frame = itemFrames.get(currentFrameIndex);
             if (isTargetValid(frame)) {
                 currentTargetFrame = frame;
                 return;

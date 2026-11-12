@@ -7,8 +7,8 @@ import meteordevelopment.meteorclient.systems.hud.HudElementInfo;
 import meteordevelopment.meteorclient.systems.hud.HudRenderer;
 import meteordevelopment.meteorclient.systems.modules.Modules;
 import meteordevelopment.meteorclient.utils.render.color.Color;
-import net.minecraft.entity.Entity;
-import net.minecraft.text.Text;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.network.chat.Component;
 
 public class InfReachHud extends HudElement {
 
@@ -33,7 +33,7 @@ public class InfReachHud extends HudElement {
         if (infReach != null && infReach.isActive()) {
             Entity targetEntity = infReach.getClosestEntity();
             if (targetEntity != null) {
-                Text name = targetEntity.getDisplayName();
+                Component name = targetEntity.getDisplayName();
                 if (name != null) {
                     text += name.getString();
                 }

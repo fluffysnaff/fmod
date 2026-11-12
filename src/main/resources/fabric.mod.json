@@ -11,7 +11,7 @@
   "contact": {
     "repo": "https://gitlab.com/fluffysnaff/fmod"
   },
-  "icon": "assets/template/icon.png",
+  "icon": "assets/template/icon.PNG",
   "environment": "client",
   "entrypoints": {
     "meteor": [
@@ -25,8 +25,9 @@
     "meteor-client:color": "225,25,25"
   },
   "depends": {
-    "java": ">=21",
+    "java": ">=${java_version}",
+    "fabricloader": ">=${loader_version}",
     "minecraft": ["${mc_version}"],
-    "meteor-client": "*"
+    "meteor-client": ">=26.3-0 <26.4"
   }
 }

@@ -1,13 +1,10 @@
 {
   "required": true,
   "package": "addon.fmod.mixin",
-  "compatibilityLevel": "JAVA_21",
+  "compatibilityLevel": "JAVA_25",
   "client": [
-    "PlayerMoveC2SPacketAccessor",
     "PlayerPositionPacketMixin",
     "VehicleMovePacketMixin",
-    "VehicleMoveC2SPacketAccessor",
-    "PlayerPositionFullPacketMixin",
     "ClientPlayerInteractionManagerMixin",
     "AbstractBlockBlockStateMixin",
     "AbstractBlockMixin"

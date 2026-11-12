@@ -11,14 +11,14 @@ import meteordevelopment.meteorclient.utils.render.RenderUtils;
 import meteordevelopment.meteorclient.utils.render.color.SettingColor;
 import meteordevelopment.meteorclient.utils.world.BlockUtils;
 import meteordevelopment.orbit.EventHandler;
-import net.minecraft.block.BlockState;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.util.shape.VoxelShape;
-import net.minecraft.util.math.Box;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.VoxelShape;
+import net.minecraft.world.phys.AABB;
 
 public class TpMine extends Module {
     private final SettingGroup sgGeneral = settings.getDefaultGroup();
@@ -56,9 +56,9 @@ public class TpMine extends Module {
 
     @EventHandler
     public void onTick(TickEvent.Post event) {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
 
-        hitResult = mc.player.raycast(maxDistance.get(), 1f / 20f, false); // 1f/20f is tick delta, typically 1.0f for full tick
+        hitResult = mc.player.pick(maxDistance.get(), 1f / 20f, false); // 1f/20f is tick delta, typically 1.0f for full tick
         if (hitResult == null || hitResult.getType() != HitResult.Type.BLOCK) {
             pos = null; // Clear position if not looking at a block
             return;
@@ -66,21 +66,21 @@ public class TpMine extends Module {
 
         pos = ((BlockHitResult) hitResult).getBlockPos();
 
-        if (mc.options.attackKey.isPressed()) {
-            Direction side = ((BlockHitResult) hitResult).getSide();
-            BlockState state = mc.world.getBlockState(pos);
-            VoxelShape shape = state.getCollisionShape(mc.world, pos);
+        if (mc.options.keyAttack.isDown()) {
+            Direction side = ((BlockHitResult) hitResult).getDirection();
+            BlockState state = mc.level.getBlockState(pos);
+            VoxelShape shape = state.getCollisionShape(mc.level, pos);
             if (shape.isEmpty()) {
-                shape = state.getOutlineShape(mc.world, pos);
+                shape = state.getShape(mc.level, pos);
             }
 
-            double height = shape.isEmpty() ? 1 : shape.getMax(Direction.Axis.Y);
-            double tx = pos.getX() + 0.5 + side.getOffsetX() * 0.5; // Target center of the side, or slightly offset
+            double height = shape.isEmpty() ? 1 : shape.max(Direction.Axis.Y);
+            double tx = pos.getX() + 0.5 + side.getStepX() * 0.5; // Target center of the side, or slightly offset
             double ty = pos.getY() + height; // Target top of the block or its shape
-            double tz = pos.getZ() + 0.5 + side.getOffsetZ() * 0.5;
+            double tz = pos.getZ() + 0.5 + side.getStepZ() * 0.5;
 
-            Vec3d startPos = mc.player.getPos();
-            Vec3d endPos = new Vec3d(tx, ty, tz); // This target position might be inside a block, adjust as needed
+            Vec3 startPos = mc.player.position();
+            Vec3 endPos = new Vec3(tx, ty, tz); // This target position might be inside a block, adjust as needed
 
             // Exploit
             WarpUtils.warpTo(endPos, 9);
@@ -90,22 +90,22 @@ public class TpMine extends Module {
 
             // Go black
             WarpUtils.moveTo(startPos);
-            mc.player.setPosition(startPos); // Sync client position
+            mc.player.setPos(startPos); // Sync client position
         }
     }
 
     @EventHandler
     public void onRender(Render3DEvent event) {
-        if (!isRenderBlock.get() || pos == null || hitResult == null || hitResult.getType() != HitResult.Type.BLOCK || mc.world == null) {
+        if (!isRenderBlock.get() || pos == null || hitResult == null || hitResult.getType() != HitResult.Type.BLOCK || mc.level == null) {
             return;
         }
-        VoxelShape shape = mc.world.getBlockState(pos).getOutlineShape(mc.world, pos);
+        VoxelShape shape = mc.level.getBlockState(pos).getShape(mc.level, pos);
         if (shape.isEmpty()) return;
-        Box box = shape.getBoundingBox();
+        AABB box = shape.bounds();
         render(event, pos, box);
     }
 
-    private void render(Render3DEvent event, BlockPos bp, Box box) {
+    private void render(Render3DEvent event, BlockPos bp, AABB box) {
         event.renderer.box(bp.getX() + box.minX, bp.getY() + box.minY, bp.getZ() + box.minZ, bp.getX() + box.maxX, bp.getY() + box.maxY, bp.getZ() + box.maxZ, targetColor.get(), targetColor.get(), ShapeMode.Both, 0);
     }
 }

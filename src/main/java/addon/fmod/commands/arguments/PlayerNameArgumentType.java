@@ -6,8 +6,8 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
-import net.minecraft.command.CommandSource;
-import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.commands.SharedSuggestionProvider;
+import net.minecraft.world.entity.player.Player;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -20,17 +20,17 @@ public class PlayerNameArgumentType implements ArgumentType<String> {
     private static Collection<String> EXAMPLES;
 
     static {
-        if (mc.world != null && mc.getNetworkHandler() != null) {
-            EXAMPLES = mc.world.getPlayers()
+        if (mc.level != null && mc.getConnection() != null) {
+            EXAMPLES = mc.level.players()
                 .stream()
-                .map(PlayerEntity::getNameForScoreboard)
+                .map(Player::getScoreboardName)
                 .collect(Collectors.toList()
                 );
 
-            EXAMPLES.addAll(mc.getNetworkHandler().getPlayerList()
+            EXAMPLES.addAll(mc.getConnection().getOnlinePlayers()
                 .stream()
                 .limit(3)
-                .map(entry -> entry.getProfile().getName())
+                .map(entry -> entry.getProfile().name())
                 .toList()
             );
         }
@@ -58,20 +58,20 @@ public class PlayerNameArgumentType implements ArgumentType<String> {
     @Override
     public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> context, SuggestionsBuilder builder) {
         Collection<String> suggestions = new ArrayList<>(
-            mc.world.getPlayers()
+            mc.level.players()
                 .stream()
-                .map(PlayerEntity::getNameForScoreboard)
+                .map(Player::getScoreboardName)
                 .toList()
         );
 
-        suggestions.addAll(mc.getNetworkHandler().getPlayerList()
+        suggestions.addAll(mc.getConnection().getOnlinePlayers()
             .stream()
             .limit(3)
-            .map(entry -> entry.getProfile().getName())
+            .map(entry -> entry.getProfile().name())
             .toList()
         );
 
-        return CommandSource.suggestMatching(suggestions, builder);
+        return SharedSuggestionProvider.suggest(suggestions, builder);
     }
 
     @Override

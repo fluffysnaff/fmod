@@ -7,13 +7,13 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.exceptions.DynamicCommandExceptionType;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
-import net.minecraft.command.CommandSource;
-import net.minecraft.server.command.CommandManager;
-import net.minecraft.text.Text;
-import net.minecraft.util.Pair;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec2f;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.commands.SharedSuggestionProvider;
+import net.minecraft.commands.Commands;
+import net.minecraft.network.chat.Component;
+import com.mojang.datafixers.util.Pair;
+import net.minecraft.util.Mth;
+import net.minecraft.world.phys.Vec2;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -23,12 +23,12 @@ import java.util.concurrent.CompletableFuture;
 
 import static meteordevelopment.meteorclient.MeteorClient.mc;
 
-public class PositionArgumentType implements ArgumentType<Vec3d> {
+public class PositionArgumentType implements ArgumentType<Vec3> {
     private static final Collection<String> EXAMPLES = Arrays.asList("0 0 0", "~ ~ ~", "^ ^ ^", "^1 ^ ^-5", "0.1 -0.5 .9", "~0.5 ~1 ~-5");
 
-    private static final DynamicCommandExceptionType MISSING_COORDINATE = new DynamicCommandExceptionType(object -> Text.literal("Command is incomplete missing 1 or more coordinates."));
-    private static final DynamicCommandExceptionType INCOMPLETE_EXCEPTION = new DynamicCommandExceptionType(object -> Text.literal("Incomplete position argument."));
-    private static final DynamicCommandExceptionType MIXED_COORDINATE_EXCEPTION = new DynamicCommandExceptionType(object -> Text.literal("Can't mix two or more position argument types."));
+    private static final DynamicCommandExceptionType MISSING_COORDINATE = new DynamicCommandExceptionType(object -> Component.literal("Command is incomplete missing 1 or more coordinates."));
+    private static final DynamicCommandExceptionType INCOMPLETE_EXCEPTION = new DynamicCommandExceptionType(object -> Component.literal("Incomplete position argument."));
+    private static final DynamicCommandExceptionType MIXED_COORDINATE_EXCEPTION = new DynamicCommandExceptionType(object -> Component.literal("Can't mix two or more position argument types."));
 
     private final boolean centerIntegers;
 
@@ -44,26 +44,26 @@ public class PositionArgumentType implements ArgumentType<Vec3d> {
         return new PositionArgumentType(centerIntegers);
     }
 
-    public static Vec3d getPos(final CommandContext<?> context, final String name) {
-        return context.getArgument(name, Vec3d.class);
+    public static Vec3 getPos(final CommandContext<?> context, final String name) {
+        return context.getArgument(name, Vec3.class);
     }
 
-    public Vec3d parse(StringReader stringReader) throws CommandSyntaxException {
+    public Vec3 parse(StringReader stringReader) throws CommandSyntaxException {
         return stringReader.canRead() && stringReader.peek() == '^' ? parseLookingPos(stringReader) : parsePos(stringReader, this.centerIntegers);
     }
 
     public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> context, SuggestionsBuilder builder) {
-        if (!(context.getSource() instanceof CommandSource)) {
+        if (!(context.getSource() instanceof SharedSuggestionProvider)) {
             return Suggestions.empty();
         } else {
             String string = builder.getRemaining();
 
             if (!string.isEmpty() && string.charAt(0) == '^') {
-                Set<CommandSource.RelativePosition> collection = Collections.singleton(CommandSource.RelativePosition.ZERO_LOCAL);
-                return CommandSource.suggestPositions(string, collection, builder, CommandManager.getCommandValidator(this::parse));
+                Set<SharedSuggestionProvider.TextCoordinates> collection = Collections.singleton(SharedSuggestionProvider.TextCoordinates.DEFAULT_LOCAL);
+                return SharedSuggestionProvider.suggestCoordinates(string, collection, builder, Commands.createValidator(this::parse));
             } else {
-                Collection<CommandSource.RelativePosition> collection = ((CommandSource) context.getSource()).getPositionSuggestions();
-                return CommandSource.suggestPositions(string, collection, builder, CommandManager.getCommandValidator(this::parse));
+                Collection<SharedSuggestionProvider.TextCoordinates> collection = ((SharedSuggestionProvider) context.getSource()).getAbsoluteCoordinates();
+                return SharedSuggestionProvider.suggestCoordinates(string, collection, builder, Commands.createValidator(this::parse));
             }
         }
     }
@@ -73,7 +73,7 @@ public class PositionArgumentType implements ArgumentType<Vec3d> {
     }
 
     // Looking Pos
-    private Vec3d parseLookingPos(StringReader reader) throws CommandSyntaxException {
+    private Vec3 parseLookingPos(StringReader reader) throws CommandSyntaxException {
         String argument = reader.getString();
         int cursor = reader.getCursor();
 
@@ -89,7 +89,7 @@ public class PositionArgumentType implements ArgumentType<Vec3d> {
 
                 double z = readCoordinate(reader, cursor);
 
-                return toAbsolutePos(new Vec3d(x, y, z));
+                return toAbsolutePos(new Vec3(x, y, z));
             } else {
                 reader.setCursor(cursor);
 
@@ -102,27 +102,27 @@ public class PositionArgumentType implements ArgumentType<Vec3d> {
         }
     }
 
-    public Vec3d toAbsolutePos(Vec3d original) {
+    public Vec3 toAbsolutePos(Vec3 original) {
         if(mc.player == null) return original;
-        Vec2f rotation = mc.player.getRotationClient();
-        Vec3d position = mc.player.getPos();
+        Vec2 rotation = mc.player.getRotationVector();
+        Vec3 position = mc.player.position();
 
-        float cos1 = MathHelper.cos((rotation.y + 90.0F) * 0.017453292F);
-        float sin1 = MathHelper.sin((rotation.y + 90.0F) * 0.017453292F);
-        float cos2 = MathHelper.cos(-rotation.x * 0.017453292F);
-        float sin2 = MathHelper.sin(-rotation.x * 0.017453292F);
-        float cos3 = MathHelper.cos((-rotation.x + 90.0F) * 0.017453292F);
-        float sin3 = MathHelper.sin((-rotation.x + 90.0F) * 0.017453292F);
+        float cos1 = Mth.cos((rotation.y + 90.0F) * 0.017453292F);
+        float sin1 = Mth.sin((rotation.y + 90.0F) * 0.017453292F);
+        float cos2 = Mth.cos(-rotation.x * 0.017453292F);
+        float sin2 = Mth.sin(-rotation.x * 0.017453292F);
+        float cos3 = Mth.cos((-rotation.x + 90.0F) * 0.017453292F);
+        float sin3 = Mth.sin((-rotation.x + 90.0F) * 0.017453292F);
 
-        Vec3d vector1 = new Vec3d(cos1 * cos2, sin2, sin1 * cos2);
-        Vec3d vector2 = new Vec3d(cos1 * cos3, sin3, sin1 * cos3);
-        Vec3d product = vector1.crossProduct(vector2).multiply(-1.0D);
+        Vec3 vector1 = new Vec3(cos1 * cos2, sin2, sin1 * cos2);
+        Vec3 vector2 = new Vec3(cos1 * cos3, sin3, sin1 * cos3);
+        Vec3 product = vector1.cross(vector2).scale(-1.0D);
 
-        double x = vector1.x * original.getZ() + vector2.x * original.getY() + product.x * original.getX();
-        double y = vector1.y * original.getZ() + vector2.y * original.getY() + product.y * original.getX();
-        double z = vector1.z * original.getZ() + vector2.z * original.getY() + product.z * original.getX();
+        double x = vector1.x * original.z + vector2.x * original.y + product.x * original.x;
+        double y = vector1.y * original.z + vector2.y * original.y + product.y * original.x;
+        double z = vector1.z * original.z + vector2.z * original.y + product.z * original.x;
 
-        return new Vec3d(position.x + x, position.y + y, position.z + z);
+        return new Vec3(position.x + x, position.y + y, position.z + z);
     }
 
     private double readCoordinate(StringReader reader, int start) throws CommandSyntaxException {
@@ -143,7 +143,7 @@ public class PositionArgumentType implements ArgumentType<Vec3d> {
 
     // Default Pos
 
-    private Vec3d parsePos(StringReader reader, boolean centerIntegers) throws CommandSyntaxException {
+    private Vec3 parsePos(StringReader reader, boolean centerIntegers) throws CommandSyntaxException {
         String argument = reader.getString();
         int cursor = reader.getCursor();
 
@@ -159,10 +159,10 @@ public class PositionArgumentType implements ArgumentType<Vec3d> {
 
                 Pair<Boolean, Double> z = parseCoordinate(reader, centerIntegers);
 
-                return new Vec3d(
-                    x.getLeft() ? x.getRight() + mc.player.getX() : x.getRight(),
-                    y.getLeft() ? y.getRight() + mc.player.getY() : y.getRight(),
-                    z.getLeft() ? z.getRight() + mc.player.getZ() : z.getRight()
+                return new Vec3(
+                    x.getFirst() ? x.getSecond() + mc.player.getX() : x.getSecond(),
+                    y.getFirst() ? y.getSecond() + mc.player.getY() : y.getSecond(),
+                    z.getFirst() ? z.getSecond() + mc.player.getZ() : z.getSecond()
                 );
             } else {
                 reader.setCursor(cursor);
@@ -191,13 +191,13 @@ public class PositionArgumentType implements ArgumentType<Vec3d> {
             String string = reader.getString().substring(cursor, reader.getCursor());
 
             if (relative && string.isEmpty()) {
-                return new Pair<>(true, 0.0);
+                return Pair.of(true, 0.0);
             } else {
                 if (!string.contains(".") && !relative && center) {
                     value += 0.5;
                 }
 
-                return new Pair<>(relative, value);
+                return Pair.of(relative, value);
             }
         }
     }
