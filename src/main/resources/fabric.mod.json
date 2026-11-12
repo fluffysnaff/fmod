@@ -9,7 +9,8 @@
     "fluffysnaff"
   ],
   "contact": {
-    "repo": "https://gitlab.com/fluffysnaff/fmod"
+    "sources": "https://github.com/fluffysnaff/fmod",
+    "issues": "https://github.com/fluffysnaff/fmod/issues"
   },
   "icon": "assets/template/icon.PNG",
   "environment": "client",

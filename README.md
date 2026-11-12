@@ -8,7 +8,7 @@
 
 <!-- Fancy badges -->
 <div align="center">
-  <a href="https://gitlab.com/fluffysnaff/fmod/-/releases"><img src="https://img.shields.io/badge/Version-0.2.0-blue" alt="Version"></a>
+  <a href="https://github.com/fluffysnaff/fmod/releases"><img src="https://img.shields.io/badge/Version-0.2.0-blue" alt="Version"></a>
   <img src="https://img.shields.io/badge/Minecraft-26.3-green" alt="Minecraft Version">
   <img src="https://img.shields.io/badge/Meteor%20Client-Addon-purple" alt="Meteor Addon">
   <img src="https://img.shields.io/badge/spaghetti%20code-yes-success?logo=java" alt="Spagetti code: yes">
@@ -100,7 +100,7 @@ Building requires a JDK 25 installation. Set `JAVA_HOME` to that JDK, then use t
 
 1.  **Clone the Repository**:
     ```bash
-    git clone https://gitlab.com/fluffysnaff/fmod.git
+    git clone https://github.com/fluffysnaff/fmod.git
     cd fmod
     ```
 2.  **Build the Project**:
@@ -131,3 +131,7 @@ Credits:
 *   **[JorianWoltjer/LiveOverflowMod](https://github.com/JorianWoltjer/LiveOverflowMod)**
 
 ---
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=fluffysnaff/fmod&type=Date)](https://www.star-history.com/#fluffysnaff/fmod&Date)
