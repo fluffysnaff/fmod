@@ -3,9 +3,6 @@
   "package": "addon.fmod.mixin",
   "compatibilityLevel": "JAVA_25",
   "client": [
-    "PlayerPositionPacketMixin",
-    "VehicleMovePacketMixin",
-    "ClientPlayerInteractionManagerMixin",
     "AbstractBlockBlockStateMixin",
     "AbstractBlockMixin"
   ],

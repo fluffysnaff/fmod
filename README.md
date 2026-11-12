@@ -4,7 +4,7 @@
   <img src="src/main/resources/assets/template/icon.PNG" alt="FMod Logo" width="200"/>
 </div>
 
-**FMod** is an addon for the [Meteor Client](https://meteorclient.com/), a modern Minecraft utility mod. FMod enhances your gameplay with a suite of powerful movement utilities, combat assistance, and other useful features, with some specifically tailored for servers like the LiveOverflow server.
+**FMod** is an addon for the [Meteor Client](https://meteorclient.com/), a modern Minecraft utility mod. FMod enhances your gameplay with block rendering controls, item frame automation, and movement commands, with some specifically tailored for servers like the LiveOverflow server.
 
 <!-- Fancy badges -->
 <div align="center">
@@ -22,11 +22,6 @@ FMod introduces a variety of modules, commands, and HUD elements designed to giv
 
 ### ✨ Modules
 
-*   **`InstaMine`**: Attempts to break blocks extremely quickly if they are already breakable in a very short amount of time (e.g., with Haste or efficient tools).
-*   **`LiveWalk`**: Helps bypass certain anti-cheat measures (like those on the LiveOverflow server) by rounding your movement packet coordinates. Includes support for vehicles.
-*   **`TpMine`**: Silently teleports you to a targeted block, breaks it, and then teleports you back to your original position.
-*   **`InfReach`**: Targets the closest entity within your aim and a configurable range. It then teleports you to the target, attacks it, and returns you to your starting position. Includes on-screen target highlighting.
-*   **`FrozenWalk`**: Allows you to move within protected regions or bypass certain movement restrictions without being teleported back by the server. Includes an anti-fly-kick feature.
 *   **`NoTextureRotations`**: Disables the random rotation of certain block textures (e.g., grass, sand, bedrock), providing a more consistent and potentially cleaner visual experience. *Requires a world rejoin or graphics reload to take full effect.*
 *   **`FrameDupe`**: A utility that automatically interacts with nearby item frames to duplicate items. It works by quickly placing and breaking items in frames, which can trigger duplication glitches on certain servers.
 
@@ -49,10 +44,6 @@ Commands are prefixed with a `.` (dot), Meteor Client's default command prefix.
 *   **`.clubmate` (aliases: `.cm`, `.clubm`, `.cmate`)**
     *   Usage: `.clubmate clubmate`
     *   A specialized command designed for the LiveOverflow server to interact with a specific chest and obtain a "Club-Mate."
-
-### 🖥️ HUD
-
-*   **`InfReach Target`**: Displays the name of the current entity being targeted by the `InfReach` module on your Heads-Up Display.
 
 ---
 
