@@ -3,8 +3,16 @@
   "package": "addon.fmod.mixin",
   "compatibilityLevel": "JAVA_25",
   "client": [
+    "DebugCoordinatesMixin",
+    "MeteorCoordinateHudMixin",
+    "MeteorCoordinateTextMixin",
+    "VanillaCoordinateTextMixin",
     "AbstractBlockBlockStateMixin",
-    "AbstractBlockMixin"
+    "AbstractBlockMixin",
+    "stashhunting.LivingEntityMixin",
+    "stashhunting.EntityMixin",
+    "stashhunting.KeyBindingMixin",
+    "stashhunting.XaeroDrawingMixin"
   ],
   "injectors": {
     "defaultRequire": 1

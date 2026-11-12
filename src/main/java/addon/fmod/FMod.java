@@ -3,9 +3,11 @@ package addon.fmod;
 import addon.fmod.commands.commands.*;
 import addon.fmod.modules.*;
 import addon.fmod.modules.notexturerotations.NoTextureRotations;
+import addon.fmod.stashhunting.StashHunting;
 import com.mojang.logging.LogUtils;
 import meteordevelopment.meteorclient.addons.MeteorAddon;
 import meteordevelopment.meteorclient.commands.Commands;
+import meteordevelopment.meteorclient.systems.hud.HudGroup;
 import meteordevelopment.meteorclient.systems.modules.Category;
 import meteordevelopment.meteorclient.systems.modules.Modules;
 import net.minecraft.world.item.Items;
@@ -14,6 +16,7 @@ import org.slf4j.Logger;
 public class FMod extends MeteorAddon {
     public static final Logger LOG = LogUtils.getLogger();
     public static final Category CATEGORY = new Category("FMod", () -> Items.AMETHYST_SHARD.getDefaultInstance());
+    public static final HudGroup HUD_GROUP = new HudGroup("FMod");
 
     @Override
     public void onInitialize() {
@@ -24,6 +27,7 @@ public class FMod extends MeteorAddon {
 
         // Commands
         initCommandsFMod();
+        StashHunting.register();
 
     }
 
@@ -41,6 +45,7 @@ public class FMod extends MeteorAddon {
     {
         Modules.get().add(new NoTextureRotations());
         Modules.get().add(new FrameDupe());
+        Modules.get().add(new CoordHider());
     }
 
     private void initCommandsFMod()

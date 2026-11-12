@@ -9,6 +9,15 @@ base {
 }
 
 repositories {
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = "Modrinth"
+                url = uri("https://api.modrinth.com/maven")
+            }
+        }
+        filter { includeGroup("maven.modrinth") }
+    }
     maven {
         name = "meteor-maven"
         url = uri("https://maven.meteordev.org/releases")
@@ -26,6 +35,16 @@ dependencies {
 
     // Meteor
     implementation("meteordevelopment:meteor-client:${properties["meteor_version"] as String}")
+
+    // Optional map and pathfinding integrations; supplied by the user's installed mods.
+    compileOnly("maven.modrinth:xaeroplus:2.37.2+fabric-26.3") { isTransitive = false }
+    compileOnly("maven.modrinth:xaeros-world-map:fabric-26.3-1.47.2") { isTransitive = false }
+    compileOnly("maven.modrinth:xaeros-minimap:fabric-26.3-26.6.2") { isTransitive = false }
+    compileOnly("meteordevelopment:baritone:26.3-SNAPSHOT") { isTransitive = false }
+    compileOnly("net.lenni0451:LambdaEvents:2.4.2")
+    compileOnly("com.github.ben-manes.caffeine:caffeine:3.1.8")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.13.4")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 java {
@@ -33,6 +52,7 @@ java {
 }
 
 tasks {
+    test { useJUnitPlatform() }
     processResources {
         val propertyMap = mapOf(
             "version" to project.version,
@@ -55,6 +75,7 @@ tasks {
         from("LICENSE") {
             rename { "${it}_${licenseSuffix}" }
         }
+        from("LICENSE-Meteor", "THIRD_PARTY_NOTICES.md")
     }
 
     withType<JavaCompile> {

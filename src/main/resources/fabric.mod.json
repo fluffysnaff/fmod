@@ -4,7 +4,7 @@
   "version": "${version}",
 
   "name": "FMod",
-  "description": "Best mod for LiveOverflow server",
+  "description": "Stash hunting, route and flight helpers, coordinate hiding, and utilities for Meteor Client.",
   "authors": [
     "fluffysnaff"
   ],
