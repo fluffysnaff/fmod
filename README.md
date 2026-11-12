@@ -117,9 +117,11 @@ Building requires a JDK 25 installation. Set `JAVA_HOME` to that JDK, then use t
 
 ---
 
-## Source and credits
+## License, source and credits
 
-The stashhunting port preserves upstream attribution. The upstream revision has no license file; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for provenance and redistribution limitations. The existing CC0 dedication does not relicense third-party code.
+FMod's original code is available under the [MIT License](LICENSE). The previous CC0 dedication is retained in [LICENSE-CC0](LICENSE-CC0).
+
+The stashhunting port preserves upstream attribution. The upstream revision has no license file, and Meteor-derived code retains its GPL license; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for scope, provenance and redistribution limitations. FMod's MIT license applies to its original code, not the imported third-party code.
 
 Credits:
 
