@@ -1,9 +1,11 @@
 # Source provenance
 
-FMod's original code is offered under the MIT License in `LICENSE`.
-The previous CC0 dedication is preserved in `LICENSE-CC0`. Third-party code
-retains its own licensing status; neither FMod's MIT license nor its historical
-CC0 dedication relicenses imported code.
+Copyright (C) 2026 fluffysnaff and contributors.
+
+FMod's original code and modifications are licensed under GNU GPL version 3
+(`GPL-3.0-only`), using the license text in `LICENSE`. Existing third-party
+copyright notices are retained. Earlier versions remain available in Git
+history under the MIT or CC0 terms with which they were published.
 
 The stashhunting port in `src/main/java/addon/fmod/stashhunting` and
 `src/main/java/addon/fmod/mixin/stashhunting` is adapted from
@@ -16,12 +18,13 @@ That upstream revision does not contain a license file. Attribution records
 the source of this port; it does not grant or establish permission to redistribute
 the upstream work. Confirm permission from the upstream authors before
 redistributing their code. `StashHunting.java` and `WebhookClient.java` are new
-FMod integration code covered by FMod's MIT license.
+FMod integration code covered by FMod's GPL-3.0-only license. Adopting GPL for
+FMod does not itself grant rights to the upstream work without a published license.
 
 `AutoEXPPlus.java` retains its Meteor Development copyright header and is derived
 from [Meteor Client](https://github.com/MeteorDevelopment/meteor-client).
-Meteor Client is licensed under GNU GPL version 3; the license text is included
-in `LICENSE-Meteor`. Source and modifications are available in this repository.
+Meteor Client is licensed under GNU GPL version 3; the same license text is
+included in `LICENSE`. Source and modifications are available in this repository.
 
 FMod's pre-existing NoTextureRotations feature credits
 [rfresh2/NoTextureRotations](https://github.com/rfresh2/NoTextureRotations/), and

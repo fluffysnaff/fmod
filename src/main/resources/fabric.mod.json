@@ -4,6 +4,7 @@
   "version": "${version}",
 
   "name": "FMod",
+  "license": "GPL-3.0-only",
   "description": "Stash hunting, route and flight helpers, coordinate hiding, and utilities for Meteor Client.",
   "authors": [
     "fluffysnaff"

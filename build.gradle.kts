@@ -75,7 +75,7 @@ tasks {
         from("LICENSE") {
             rename { "${it}_${licenseSuffix}" }
         }
-        from("LICENSE-CC0", "LICENSE-Meteor", "THIRD_PARTY_NOTICES.md")
+        from("THIRD_PARTY_NOTICES.md")
     }
 
     withType<JavaCompile> {

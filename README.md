@@ -119,9 +119,9 @@ Building requires a JDK 25 installation. Set `JAVA_HOME` to that JDK, then use t
 
 ## License, source and credits
 
-FMod's original code is available under the [MIT License](LICENSE). The previous CC0 dedication is retained in [LICENSE-CC0](LICENSE-CC0).
+FMod's original code and modifications are licensed under the [GNU General Public License version 3](LICENSE) (`GPL-3.0-only`).
 
-The stashhunting port preserves upstream attribution. The upstream revision has no license file, and Meteor-derived code retains its GPL license; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for scope, provenance and redistribution limitations. FMod's MIT license applies to its original code, not the imported third-party code.
+Meteor-derived code retains its copyright notices and GPL licensing. The stashhunting port preserves upstream attribution; its upstream revision has no license file. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for provenance and the outstanding permission requirement for that imported code.
 
 Credits:
 
