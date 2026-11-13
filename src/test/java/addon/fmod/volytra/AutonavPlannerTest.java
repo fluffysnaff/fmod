@@ -68,4 +68,27 @@ class AutonavPlannerTest {
         var result=AutonavPlanner.escape(grid,new int[]{0,0,0},5,500);
         assertEquals(AutonavPlanner.Status.SEALED,result.status,"A route requiring a new solid-block collision is unusable");
     }
+
+    @Test void relocationFindsAShortPassableBackoffRatherThanAnotherGoalAttempt() {
+        Grid grid=new Grid(){
+            public boolean isPassable(int x,int y,int z,int clearance){return x<=0&&z==0;}
+            public int escapeCost(int x,int y,int z){return isPassable(x,y,z,0)?0:-1;}
+        };
+        var result=AutonavPlanner.relocate(grid,new int[]{0,0,0},8,1000,3);
+        assertEquals(AutonavPlanner.Status.RELOCATING,result.status);
+        assertTrue(result.cells.getLast()[0]<=-3);
+        assertTrue(result.cells.stream().allMatch(cell->grid.isPassable(cell[0],cell[1],cell[2],0)));
+    }
+
+    @Test void goalToleranceUsesTheActualStartPositionRatherThanTheCellCentre() {
+        Grid grid=new Grid(){
+            public boolean isPassable(int x,int y,int z,int clearance){return true;}
+            public double distanceToGoal(int x,int y,int z,double targetX,double targetZ){
+                return x==0&&z==0?Math.hypot(.01-targetX,.5-targetZ):super.distanceToGoal(x,y,z,targetX,targetZ);
+            }
+        };
+        var result=AutonavPlanner.plan(grid,new int[]{0,0,0},1.4,.5,1,0,0,1000,0);
+        assertEquals(AutonavPlanner.Status.REACHED_DESTINATION,result.status);
+        assertTrue(result.cells.size()>1,"Being outside the radius must not return an empty movement route");
+    }
 }

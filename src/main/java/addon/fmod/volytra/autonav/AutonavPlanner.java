@@ -24,6 +24,9 @@ public final class AutonavPlanner {
 
     /** The world, as the planner sees it. Cells are whole blocks: (x, y, z) is the block position. */
     public interface Grid {
+        default double distanceToGoal(int x, int y, int z, double targetX, double targetZ) {
+            return Math.hypot(x + 0.5 - targetX, z + 0.5 - targetZ);
+        }
         /** Whether the chunk at these chunk coordinates is not loaded. */
         boolean isChunkUnloaded(int chunkX, int chunkZ);
 
@@ -63,7 +66,8 @@ public final class AutonavPlanner {
          * The player is in something (blocks, or a fluid it avoids) that the normal search can't lead out
          * of. The route is the cheapest way through it to open space, and ends there.
          */
-        ESCAPING
+        ESCAPING,
+        RELOCATING
     }
 
     public static final class Result {
@@ -133,7 +137,7 @@ public final class AutonavPlanner {
             Comparator.comparingDouble((Entry e) -> e.f).thenComparingDouble(e -> e.node.h));
 
         Node startNode = new Node(start[0], start[1], start[2]);
-        startNode.h = horizontalDistance(startNode, destX, destZ);
+        startNode.h = grid.distanceToGoal(startNode.x, startNode.y, startNode.z, destX, destZ);
         startNode.f = HEURISTIC_WEIGHT * startNode.h;
         nodes.put(key(start[0], start[1], start[2]), startNode);
         open.add(new Entry(startNode, startNode.f));
@@ -168,7 +172,7 @@ public final class AutonavPlanner {
                 if (next == null) {
                     next = new Node(nx, ny, nz);
                     next.blocked = grid.isChunkUnloaded(nx >> 4, nz >> 4) || !grid.isPassable(nx, ny, nz, clearance);
-                    next.h = horizontalDistance(next, destX, destZ);
+                    next.h = grid.distanceToGoal(next.x, next.y, next.z, destX, destZ);
                     nodes.put(k, next);
                 }
                 if (next.blocked || next.closed) continue;
@@ -198,6 +202,14 @@ public final class AutonavPlanner {
      * @param maxNodes how many cells the search may expand
      */
     public static Result escape(Grid grid, int[] start, int radius, int maxNodes) {
+        return searchEscape(grid, start, radius, maxNodes, 0, false);
+    }
+
+    public static Result relocate(Grid grid, int[] start, int radius, int maxNodes, double minimumDistance) {
+        return searchEscape(grid, start, radius, maxNodes, minimumDistance, true);
+    }
+
+    private static Result searchEscape(Grid grid, int[] start, int radius, int maxNodes, double minimumDistance, boolean relocate) {
         HashMap<Long, Node> nodes = new HashMap<>();
         PriorityQueue<Entry> open = new PriorityQueue<>(Comparator.comparingDouble((Entry e) -> e.f));
 
@@ -214,8 +226,10 @@ public final class AutonavPlanner {
             if (cur.closed || entry.f != cur.f) continue;
             cur.closed = true;
 
-            if (cur.parent != null && cur.h == 0 && freeNeighbours(grid, cur) >= 2) {
-                return new Result(Status.ESCAPING, path(cur), expanded);
+            double dx = cur.x - start[0], dy = cur.y - start[1], dz = cur.z - start[2];
+            if (cur.parent != null && cur.h == 0 && dx * dx + dy * dy + dz * dz >= minimumDistance * minimumDistance
+                && freeNeighbours(grid, cur) >= 2) {
+                return new Result(relocate ? Status.RELOCATING : Status.ESCAPING, path(cur), expanded);
             }
             if (++expanded > maxNodes) break;
 
@@ -229,7 +243,7 @@ public final class AutonavPlanner {
                 if (next == null) {
                     next = new Node(nx, ny, nz);
                     int cost = grid.escapeCost(nx, ny, nz);
-                    next.blocked = cost < 0;
+                    next.blocked = cost < 0 || relocate && !grid.isPassable(nx, ny, nz, 0);
                     next.h = Math.max(cost, 0);
                     nodes.put(k, next);
                 }
@@ -252,7 +266,8 @@ public final class AutonavPlanner {
     private static int freeNeighbours(Grid grid, Node n) {
         int free = 0;
         for (int[] d : DIRECTIONS) {
-            if (grid.escapeCost(n.x + d[0], n.y + d[1], n.z + d[2]) == 0) free++;
+            if (grid.escapeCost(n.x + d[0], n.y + d[1], n.z + d[2]) == 0
+                && grid.lineClear(n.x, n.y, n.z, n.x + d[0], n.y + d[1], n.z + d[2])) free++;
         }
         return free;
     }
@@ -274,10 +289,6 @@ public final class AutonavPlanner {
         Result full = plan(grid, start, destX, destZ, arrivalRadius, levelY, clearance, Math.max(1, maxNodes - near.expanded), Integer.MAX_VALUE);
         if (full.status == Status.SEALED && near.status == Status.BEST_EFFORT) return near;
         return full;
-    }
-
-    private static double horizontalDistance(Node n, double destX, double destZ) {
-        return Math.hypot(n.x + 0.5 - destX, n.z + 0.5 - destZ);
     }
 
     private static List<int[]> path(Node end) {

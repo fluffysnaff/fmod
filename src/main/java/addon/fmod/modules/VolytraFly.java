@@ -18,6 +18,7 @@ import addon.fmod.FMod;
 import addon.fmod.modules.CoordHider;
 import addon.fmod.volytra.FlightEnvelope;
 import addon.fmod.volytra.autonav.WaypointProgress;
+import addon.fmod.volytra.autonav.NavigationProgress;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.systems.config.Config;
 import meteordevelopment.meteorclient.systems.modules.Modules;
@@ -1082,10 +1083,6 @@ public class VolytraFly extends Module {
     private boolean mapNoRoute;
     // The current route ends on a cell touching an unloaded chunk, so it's out of date once that chunk has loaded
     private boolean mapRouteEndsAtFrontier;
-    // How many ticks in a row Autonav has been detouring with no route to follow yet (the search is still running)
-    private int mapAwaitingPlanTicks;
-    // Stuck detection leaves a search this long to finish before it counts the wait as being stuck
-    private static final int MAP_AWAITING_PLAN_GRACE_TICKS = 60;
     // While a route is being worked out, Autonav stops this far short of whatever is in the straight line's way
     private static final double MAP_OBSTACLE_STOP_DISTANCE = 8.0;
     private static final double MAP_FOLLOW_LOOKAHEAD = 12.0;
@@ -1136,13 +1133,11 @@ public class VolytraFly extends Module {
     }
     private MapRouteRequest mapRouteRequest;
     private final AtomicInteger mapRouteGeneration = new AtomicInteger();
-    private Vec3 mapLastPos;
-    private int mapStuckTicks;
-    private int mapMovingTicks;
-    private int mapEscalation;
+    private final NavigationProgress mapProgress = new NavigationProgress();
+    private Vec3 mapRecoveryOrigin;
+    private long mapRecoveryStarted;
+    private boolean mapRecoveryRequested, mapRelocating, mapPaused;
     private final XaeroMapClicks mapClicks = new XaeroMapClicks();
-    // Extra room asked of every route cell once Autonav has got stuck (the cell and its neighbours must be clear)
-    private static final double MAP_FAT_MARGIN = 0.4;
     // How far from lava / water the route planner and the straight-line check keep the player's hitbox
     private static final double MAP_LAVA_MARGIN = 1.5;
     private static final double MAP_WATER_MARGIN = 0.75;
@@ -1516,6 +1511,7 @@ public class VolytraFly extends Module {
 
         Player player = mc.player;
         if (player != null) {
+            updateAutonavProgress(player);
             boolean glidingNow = player.isFallFlying();
             // Gliding now, or gliding a tick ago and just lost it (an elytra breaking ends the glide)
             boolean wasFlying = glidingNow || glidingLastTick;
@@ -1566,22 +1562,25 @@ public class VolytraFly extends Module {
     }
 
     /**
-     * Watches for being stuck while Autonav or Autohighway is flying: the player hasn't got further
+     * Watches for being stuck while Autohighway is flying: the player hasn't got further
      * than UNSTICK_RADIUS from where they were UNSTICK_WINDOW_TICKS ago (arriving doesn't count).
      * When that happens both minimum speeds drop to 1 for UNSTICK_SLOW_TICKS and the ramp restarts
      * from there, so the way round a block in the way can be flown slowly enough for the server
      * to accept it.
      */
     private void updateUnstick(Player player) {
+        if (autonavActive && autonav.get()) {
+            unstickAnchor = null;
+            unstickWindowTicks = unstickTicksLeft = 0;
+            return;
+        }
         if (unstickTicksLeft > 0) {
             unstickTicksLeft--;
             unstickAnchor = null;
             return;
         }
 
-        boolean autonavFlying = autonavActive && autonav.get()
-            && Math.hypot(mapDestX - player.getX(), mapDestZ - player.getZ()) > autonavArrivalRadius.get();
-        if (!player.isFallFlying() || !(autonavFlying || autohighway.get())) {
+        if (!player.isFallFlying() || !autohighway.get()) {
             unstickAnchor = null;
             return;
         }
@@ -1620,6 +1619,7 @@ public class VolytraFly extends Module {
      * standing around or walking doesn't launch you.
      */
     private void relaunchAfterLanding(Player player) {
+        if (mapPaused) return;
         if (relaunchCooldown > 0) relaunchCooldown--;
         if (relaunchPause > 0) relaunchPause--;
 
@@ -1696,6 +1696,7 @@ public class VolytraFly extends Module {
      * the player dropping to the ground.
      */
     private void continueGlideAfterSwap(Player player) {
+        if (mapPaused) return;
         if (reglideTicksLeft <= 0) return;
         reglideTicksLeft--;
 
@@ -2065,7 +2066,7 @@ public class VolytraFly extends Module {
             assistantSay("avoiding", false, false, "Wuh-oh, a player! I'm making a detour");
         }
 
-        if (useFireworks.get() && inventoryAvailable()) {
+        if (useFireworks.get() && !mapPaused && inventoryAvailable()) {
             if (ticksLeft <= 0) {
                 ticksLeft = autoPilotFireworkDelay.get() * 20;
 
@@ -2782,7 +2783,7 @@ public class VolytraFly extends Module {
     public boolean getAutonavRoute(List<Vec3> out) {
         out.clear();
         Player player = mc.player;
-        if (!autonavActive || !autonav.get() || player == null) return false;
+        if (!autonavActive || !autonav.get() || mapPaused || player == null) return false;
         if (Math.hypot(mapDestX - player.getX(), mapDestZ - player.getZ()) <= autonavArrivalRadius.get()) return false;
 
         if (mapDetouring) {
@@ -2845,15 +2846,69 @@ public class VolytraFly extends Module {
         mapTicksSinceRepath = 0;
         mapNoRoute = false;
         mapRouteEndsAtFrontier = false;
-        mapAwaitingPlanTicks = 0;
         mapHighwayPhase = MAP_HIGHWAY_NONE;
         mapHighwayCooldown = 0;
         mapDetouring = false;
         mapClearStreak = 0;
-        mapLastPos = null;
-        mapStuckTicks = 0;
-        mapMovingTicks = 0;
-        mapEscalation = 0;
+        mapProgress.reset();
+        mapRecoveryOrigin = null;
+        mapRecoveryRequested = mapRelocating = mapPaused = false;
+    }
+
+    private void updateAutonavProgress(Player player) {
+        if (!autonavActive || !autonav.get()) return;
+        long now = System.nanoTime();
+        if (mc.isPaused()) { mapProgress.pause(now); return; }
+        if (mapPaused) {
+            assistantMarkActive();
+            if (isMovementKeyPhysicallyPressed() || isKeyPhysicallyPressed(mc.options.keyJump) || isKeyPhysicallyPressed(mc.options.keyShift)) cancelAutonav();
+            return;
+        }
+        Vec3 pos = player.position();
+        if (Math.hypot(mapDestX - pos.x(), mapDestZ - pos.z()) <= autonavArrivalRadius.get()) {
+            mapProgress.reset();
+            mapRecoveryOrigin = null;
+            mapRecoveryRequested = false;
+            return;
+        }
+        double stationarySeconds = mapProgress.sample(now, routePoint(pos));
+        if (mapRecoveryOrigin != null) {
+            if (pos.distanceToSqr(mapRecoveryOrigin) >= 64) {
+                mapRecoveryOrigin = null;
+                info("Autonav has cleared the stalled area and resumed the route.");
+            } else if (mapProgress.activeNanos() - mapRecoveryStarted >= TimeUnit.SECONDS.toNanos(20)) {
+                pauseAutonav("No safe recovery completed within 20 seconds.");
+                return;
+            }
+        }
+        if (stationarySeconds >= 4 && !mapRecoveryRequested && !mapRelocating) {
+            if (mapRecoveryOrigin == null) {
+                mapRecoveryOrigin = pos;
+                mapRecoveryStarted = mapProgress.activeNanos();
+                warning("Autonav is stalled near terrain; planning a short, verified escape.");
+            }
+            mapRecoveryRequested = true;
+            mapDetouring = true;
+            mapClearStreak = 0;
+            clearMapRoute();
+            mapTicksSinceRepath = Integer.MAX_VALUE / 2;
+        }
+    }
+
+    private void pauseAutonav(String reason) {
+        clearMapRoute();
+        mapPaused = true;
+        mapNoRoute = true;
+        mapRecoveryRequested = false;
+        releaseHighwayKeys();
+        if (mc.player != null) mc.player.setDeltaMovement(Vec3.ZERO);
+        warning("Autonav paused: %s Use Go to retry, or the cancel bind / movement keys to take over.", reason);
+    }
+
+    private void holdAutonavPosition(Player player) {
+        highwaySteerTarget = player.position();
+        holdHighwayDrivingKeys();
+        applyHighwayVerticalHold(player, player.getY());
     }
 
     /**
@@ -2871,6 +2926,10 @@ public class VolytraFly extends Module {
 
         assistantMarkActive();
         Vec3 pos = player.position();
+        if (mapPaused) {
+            holdAutonavPosition(player);
+            return;
+        }
         double dx = mapDestX - pos.x(), dz = mapDestZ - pos.z();
         double distToDest = Math.hypot(dx, dz);
 
@@ -2882,9 +2941,7 @@ public class VolytraFly extends Module {
             }
             resetAutonavRamp();
             assistantSay("map-arrived", false, false, "We've arrived", "I'll hover here until you take over");
-            highwaySteerTarget = pos;
-            holdHighwayDrivingKeys();
-            applyHighwayVerticalHold(player, pos.y());
+            holdAutonavPosition(player);
             return;
         }
 
@@ -2894,42 +2951,6 @@ public class VolytraFly extends Module {
         double gdx = mapGoalX - pos.x(), gdz = mapGoalZ - pos.z();
         double distToGoal = Math.max(Math.hypot(gdx, gdz), 1.0E-6);
         Vec3 goalPoint = new Vec3(mapGoalX, mapCruiseY, mapGoalZ);
-
-        // Stuck detection, like Autohighway's: barely moved for a while while trying to. It isn't
-        // counted while the next chunk along simply hasn't loaded yet, since the player is held
-        // back for that (see dont-go-into-unloaded-chunks).
-        boolean waitingOnChunks = !world.getChunkSource().hasChunk(
-            ((int) Math.floor(pos.x() + gdx / distToGoal * 6.0)) >> 4,
-            ((int) Math.floor(pos.z() + gdz / distToGoal * 6.0)) >> 4);
-        // Holding still while a route is being worked out isn't being stuck (for a while)
-        boolean awaitingPlan = mapAwaitingPlanTicks > 0 && mapAwaitingPlanTicks <= MAP_AWAITING_PLAN_GRACE_TICKS;
-        if (mapLastPos != null && !waitingOnChunks && !mappingWaitingForChunks && !awaitingPlan) {
-            if (pos.distanceTo(mapLastPos) < HIGHWAY_STUCK_MOVE_EPSILON) {
-                mapStuckTicks++;
-                mapMovingTicks = 0;
-            } else {
-                mapStuckTicks = 0;
-                mapMovingTicks++;
-                if (mapMovingTicks >= 60) mapEscalation = 0;
-            }
-        } else if (waitingOnChunks || awaitingPlan) {
-            mapStuckTicks = 0;
-        }
-        mapLastPos = pos;
-        if (mapStuckTicks >= Math.round(autonavIntelligence.get().stuckTimeout * 20)) {
-            mapStuckTicks = 0;
-            mapEscalation = Math.min(mapEscalation + 1, 4);
-            // Not getting anywhere means the straight line isn't really clear: plan round it,
-            // asking for more room round every cell
-            mapDetouring = true;
-            mapClearStreak = 0;
-            clearMapRoute();
-            if (mapEscalation == 1) {
-                assistantSay("map-stuck1", true, false, "We're a lil' stuck", "I'll try and get us out");
-            } else {
-                assistantSay("map-stuck2", true, false, "Still stuck", "Lemme give us a bit more room to manoeuvre");
-            }
-        }
 
         // Is the straight line, as far as chunks are loaded, clear?
         double lineRange = Math.min(distToGoal, Math.max(96, Math.min(400, horizontalSpeed.get() * 32)));
@@ -2947,8 +2968,8 @@ public class VolytraFly extends Module {
             mapDetouring = true;
             clearMapRoute();
             mapTicksSinceRepath = Integer.MAX_VALUE / 2; // plan straight away
-        } else if (mapDetouring && mapStuckTicks == 0
-            && mapClearStreak >= (mapEscalation > 0 ? MAP_STRAIGHT_CONFIRM_TICKS_AFTER_STUCK : MAP_STRAIGHT_CONFIRM_TICKS)) {
+        } else if (mapDetouring && !mapRelocating && !mapRecoveryRequested
+            && mapClearStreak >= (mapRecoveryOrigin != null ? MAP_STRAIGHT_CONFIRM_TICKS_AFTER_STUCK : MAP_STRAIGHT_CONFIRM_TICKS)) {
             // Back to the open line: carry on level from wherever the detour got to
             mapDetouring = false;
             mapCruiseY = Math.max(world.getMinY() + 2, Math.min(flightCeiling(), pos.y()));
@@ -2957,20 +2978,25 @@ public class VolytraFly extends Module {
         }
 
         Vec3 target = null;
-        boolean awaitingRoute = false;
         if (mapDetouring) {
             applyMapRouteResult();
+            if (mapPaused) { holdAutonavPosition(player); return; }
             mapTicksSinceRepath++;
             boolean routeLeft = mapRouteNodes.size() >= 2 && mapRouteIndex < mapRouteNodes.size() - 1;
             int interval = autonavIntelligence.get().repathInterval;
             // A long, still-unspent route doesn't need redoing every cadence, but it is refreshed
             // now and then so chunks that have loaded since get used
-            boolean routeHealthy = routeLeft && mapRouteNodes.size() - 1 - mapRouteIndex >= 8 && mapEscalation == 0;
+            boolean routeHealthy = routeLeft && mapRouteNodes.size() - 1 - mapRouteIndex >= 8;
             // A route that ends at the edge of the loaded world is out of date as soon as the chunks
             // beyond that edge have loaded, so redo it then rather than waiting for the cadence
             boolean endLoaded = routeLeft && mapRouteEndsAtFrontier && mapRouteEndHasLoaded(world, player, pos);
             boolean due = endLoaded || mapTicksSinceRepath >= (routeHealthy ? interval * 3 : interval);
-            if ((!routeLeft && !mapNoRoute) || due) submitMapPlan(world, player, pos);
+            if (mapRelocating && mapRouteIndex >= mapRouteNodes.size() - 1) {
+                clearMapRoute();
+                mapRecoveryRequested = false;
+                routeLeft = false;
+            }
+            if (!mapRelocating && ((!routeLeft && !mapNoRoute) || due)) submitMapPlan(world, player, pos);
 
             if (mapRouteNodes.size() >= 2) {
                 advanceMapRouteIndex(pos);
@@ -2985,11 +3011,9 @@ public class VolytraFly extends Module {
                 // No route to follow yet (the search is still running, or the last route has been
                 // used up). Never fall back to flying at the destination here, that is straight into
                 // whatever made the line blocked: stop short of it until the route arrives
-                awaitingRoute = true;
                 target = mapApproachTarget(pos, dirX, dirZ, blockedAt);
             }
         }
-        mapAwaitingPlanTicks = awaitingRoute ? mapAwaitingPlanTicks + 1 : 0;
         if (target == null) target = goalPoint;
 
         updateAutonavAssistant();
@@ -3148,6 +3172,7 @@ public class VolytraFly extends Module {
         mapRouteIndex = 0;
         mapNoRoute = false;
         mapRouteEndsAtFrontier = false;
+        mapRelocating = false;
     }
 
     private void cancelMapSearch() {
@@ -3213,14 +3238,14 @@ public class VolytraFly extends Module {
         final Vec3 start;
         final double destX, destZ;
         final double arrivalRadius;
-        final int escalation;
+        final boolean recovery;
         final int maxNodes;
         volatile boolean done;
         AutonavPlanner.Status status;
         ArrayList<Vec3> nodes;
 
         MapRouteRequest(int generation, ClientLevel world, Player player, Vec3 start, double destX, double destZ,
-                        double arrivalRadius, int escalation, int maxNodes) {
+                        double arrivalRadius, boolean recovery, int maxNodes) {
             this.generation = generation;
             this.world = world;
             this.player = player;
@@ -3228,7 +3253,7 @@ public class VolytraFly extends Module {
             this.destX = destX;
             this.destZ = destZ;
             this.arrivalRadius = arrivalRadius;
-            this.escalation = escalation;
+            this.recovery = recovery;
             this.maxNodes = maxNodes;
         }
     }
@@ -3243,10 +3268,10 @@ public class VolytraFly extends Module {
             mapRouteExecutor = pathWorker("FMod-Volytra-Map");
         }
 
-        // Each stuck escalation doubles how much the search may look at
-        int budget = autonavIntelligence.get().mapSearchNodes * (1 << Math.min(mapEscalation, 2));
+        // Recovery is a small local search, independent of a potentially expensive destination search.
+        int budget = mapRecoveryRequested ? 4096 : autonavIntelligence.get().mapSearchNodes;
         MapRouteRequest request = new MapRouteRequest(mapRouteGeneration.get(), world, player, pos, mapGoalX, mapGoalZ,
-            mapGoalRadius, mapEscalation, budget);
+            mapGoalRadius, mapRecoveryRequested, budget);
         mapRouteRequest = request;
         try {
             mapRouteTask = mapRouteExecutor.submit(() -> runMapPlan(request));
@@ -3261,21 +3286,12 @@ public class VolytraFly extends Module {
             AutonavPlanner.Grid grid = new MapGrid(request.world, request.player, request.start);
             int[] start = {(int) Math.floor(request.start.x()), (int) Math.floor(request.start.y()), (int) Math.floor(request.start.z())};
 
-            // After getting stuck, ask for extra room round every cell first, and settle for the
-            // normal amount only if that finds nothing
-            AutonavPlanner.Result best = null;
-            for (int clearance = request.escalation > 0 ? 1 : 0; clearance >= 0; clearance--) {
-                if (request.generation != mapRouteGeneration.get()) return; // outdated: don't waste time
-                AutonavPlanner.Result result = AutonavPlanner.planTwoPass(grid, start, request.destX, request.destZ,
-                    request.arrivalRadius, start[1], clearance, request.maxNodes);
-                boolean found = result.status == AutonavPlanner.Status.REACHED_DESTINATION
-                    || result.status == AutonavPlanner.Status.REACHED_FRONTIER;
-                if (best == null || found || (best.status == AutonavPlanner.Status.SEALED)) best = result;
-                if (found) break;
-            }
+            if (request.generation != mapRouteGeneration.get()) return;
+            AutonavPlanner.Result best = request.recovery ? AutonavPlanner.relocate(grid, start, 8, request.maxNodes, 3)
+                : AutonavPlanner.planTwoPass(grid, start, request.destX, request.destZ, request.arrivalRadius, start[1], 0, request.maxNodes);
             // Nothing to search through from here: if that's because the player is inside blocks or a
             // fluid, find the cheapest way through them to open space
-            if (best.status == AutonavPlanner.Status.SEALED && grid.escapeCost(start[0], start[1], start[2]) != 0) {
+            if (!request.recovery && best.status == AutonavPlanner.Status.SEALED && grid.escapeCost(start[0], start[1], start[2]) != 0) {
                 AutonavPlanner.Result out = AutonavPlanner.escape(grid, start, MAP_ESCAPE_RADIUS, MAP_ESCAPE_MAX_NODES);
                 if (out.status != AutonavPlanner.Status.SEALED) best = out;
             }
@@ -3301,10 +3317,16 @@ public class VolytraFly extends Module {
         MapRouteRequest request = mapRouteRequest;
         if (request == null || !request.done) return;
         mapRouteRequest = null;
-        if (request.generation != mapRouteGeneration.get() || request.status == null
+        if (request.generation != mapRouteGeneration.get()
             || request.world != mc.level || request.player != mc.player) return;
+        if (request.status == null) {
+            mapNoRoute = true;
+            if (request.recovery) pauseAutonav("The terrain planner could not complete a verified recovery.");
+            return;
+        }
 
         if (request.status == AutonavPlanner.Status.SEALED) {
+            if (request.recovery) { pauseAutonav("No passable local escape was found in the received terrain."); return; }
             mapRouteNodes.clear();
             mapRouteIndex = 0;
             mapNoRoute = true;
@@ -3317,6 +3339,7 @@ public class VolytraFly extends Module {
         mapRouteNodes.addAll(request.nodes);
         mapRouteIndex = 0;
         mapRouteEndsAtFrontier = request.status == AutonavPlanner.Status.REACHED_FRONTIER;
+        mapRelocating = request.status == AutonavPlanner.Status.RELOCATING;
     }
 
     /** Moves mapRouteIndex forward past every segment of the route the player has already flown. */
@@ -3395,6 +3418,16 @@ public class VolytraFly extends Module {
             this.start = start;
         }
 
+        private Vec3 point(int x, int y, int z) {
+            if (x == (int)Math.floor(start.x()) && y == (int)Math.floor(start.y()) && z == (int)Math.floor(start.z())) return start;
+            return new Vec3(x + 0.5, y + HIGHWAY_NODE_HEIGHT, z + 0.5);
+        }
+
+        @Override public double distanceToGoal(int x, int y, int z, double targetX, double targetZ) {
+            Vec3 point = point(x, y, z);
+            return Math.hypot(point.x() - targetX, point.z() - targetZ);
+        }
+
         @Override
         public boolean isChunkUnloaded(int chunkX, int chunkZ) {
             return !world.getChunkSource().hasChunk(chunkX, chunkZ);
@@ -3404,22 +3437,22 @@ public class VolytraFly extends Module {
         public boolean isPassable(int x, int y, int z, int clearance) {
             if (isChunkUnloaded(x >> 4, z >> 4)) return false;
             // Slightly under the clearance the movement guard enforces, so cells the planner offers always pass it
-            double margin = clearance > 0 ? MAP_FAT_MARGIN : HIGHWAY_BLOCK_CLEARANCE - 1.0E-4;
-            Vec3 point = new Vec3(x + 0.5, y + HIGHWAY_NODE_HEIGHT, z + 0.5);
+            double margin = HIGHWAY_BLOCK_CLEARANCE - 1.0E-4;
+            Vec3 point = point(x, y, z);
             return highwayPointFree(world, player, point, margin) && !mapFluidNear(world, player, point, start);
         }
 
         @Override
         public boolean lineClear(int x0, int y0, int z0, int x1, int y1, int z1) {
-            Vec3 from = new Vec3(x0 + 0.5, y0 + HIGHWAY_NODE_HEIGHT, z0 + 0.5);
-            Vec3 to = new Vec3(x1 + 0.5, y1 + HIGHWAY_NODE_HEIGHT, z1 + 0.5);
+            Vec3 from = point(x0, y0, z0);
+            Vec3 to = point(x1, y1, z1);
             return navigationSweepClear(world, player, from, to);
         }
 
         @Override
         public int escapeCost(int x, int y, int z) {
             if (isChunkUnloaded(x >> 4, z >> 4)) return -1;
-            Vec3 point = new Vec3(x + 0.5, y + HIGHWAY_NODE_HEIGHT, z + 0.5);
+            Vec3 point = point(x, y, z);
             if (!highwayPointFree(world, player, point, HIGHWAY_BLOCK_CLEARANCE - 1.0E-4)) return MAP_ESCAPE_SOLID_COST;
             if (mapFluidNear(world, player, point, null)) return MAP_ESCAPE_FLUID_COST;
             return 0;
@@ -3443,6 +3476,8 @@ public class VolytraFly extends Module {
 
     /** Has the assistant say which move Autonav is making. */
     private void updateAutonavAssistant() {
+        if (mapPaused) { assistantSay("map-paused", true, false, "Autonav paused", "Use Go to retry or cancel to take over"); return; }
+        if (mapRelocating) { assistantSay("map-escape", false, false, "Taking a short verified escape", "Then I'll retry the destination"); return; }
         // A general situation (see getAssistantText()) is being announced instead
         if (currentAssistantSituation(true) != null) return;
 
@@ -3470,6 +3505,7 @@ public class VolytraFly extends Module {
      * What the Volytra Assistant should be saying right now
      */
     public String getAssistantText() {
+        if (mapPaused) return "Autonav paused. Use Go to retry or cancel to take over.";
         boolean autonavFlying = autonavActive;
         boolean highway = autohighway.get() || autonavFlying;
         Player player = mc.player;
