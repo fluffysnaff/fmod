@@ -40,8 +40,8 @@ This branch contains the upcoming **0.3.0** changes. Build from source to use th
 
 </td>
 <td valign="top" width="193">
-  <img src="docs/assets/readme/modules.png" width="193" alt="The FMod category in Meteor's module menu, with the v0.2.0 module list">
-  <p><small>v0.2.0 menu; development modules have changed.</small></p>
+  <img src="docs/assets/readme/modules.png" width="193" alt="The current FMod module menu, including Base Scout, Stash Mover and Volytra Fly">
+  <p><small>0.3.0 development menu with optional mods installed.</small></p>
 </td>
 </tr>
 </table>
