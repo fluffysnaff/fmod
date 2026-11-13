@@ -76,6 +76,7 @@ tasks {
             rename { "${it}_${licenseSuffix}" }
         }
         from("THIRD_PARTY_NOTICES.md")
+        from("third_party/licenses") { into("META-INF/licenses") }
     }
 
     withType<JavaCompile> {

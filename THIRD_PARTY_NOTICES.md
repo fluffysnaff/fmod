@@ -30,3 +30,42 @@ FMod's pre-existing NoTextureRotations feature credits
 [rfresh2/NoTextureRotations](https://github.com/rfresh2/NoTextureRotations/), and
 its movement commands credit
 [JorianWoltjer/LiveOverflowMod](https://github.com/JorianWoltjer/LiveOverflowMod).
+
+## BepHax feature adaptations
+
+The container tracker/indexer, shulker overview, stash branding, travel monitor,
+sign history/signature tools, pearl operator, stash-mover area controls and
+DubCounter HUD use [dekrom/BepHaxAddon](https://github.com/dekrom/BepHaxAddon),
+revision `5040d95a391eb4fa3e08341c502ebcafd6613200`, as their feature/design reference.
+That revision is published under GNU GPL version 3. These are modified/native
+FMod implementations for Minecraft 26.3 and Meteor 26.3, not the original BepHax
+binary or its full dependency bundle. Credit dekrom and the BepHax contributors.
+
+BepHax credits [Stardust](https://github.com/0xTas/stardust) by 0xTas for
+StashBrander, RoadTrip, SignHistorian and SignatureSign; Stardust also publishes
+GNU GPL version 3. Those credits are preserved here. The GPL license text is
+included in `LICENSE_fmod` in the distributable.
+
+FMod's new ChestIndex is an original client-snapshot indexer sharing the native
+ChestTracker backend. It does not import the JEFF ChestIndex source. The
+outstanding permission issue for the existing stashhunting port described above
+is unchanged; a GPL declaration on an integrating project does not resolve it.
+
+## VolytraFly
+
+`modules/VolytraFly.java` and `volytra/` are adapted from
+[Volizray/VolytraFly-Addon](https://github.com/Volizray/VolytraFly-Addon), revision
+`809295685d76eb03e77f6c270ff2d45bd78666e2`. Credit Volizray for the flight
+envelope, navigation, avoidance and visual tools. The upstream project publishes
+CC0 1.0; its text is preserved in `third_party/licenses/VolytraFly-CC0-1.0.txt`
+and the JAR's `META-INF/licenses/VolytraFly-CC0-1.0.txt`. Meteor Development
+copyright headers and the GPL terms of the Meteor-derived code are retained.
+FMod integration and modifications use this project's GPL-3.0-only license.
+
+The port changes registration, lifecycle/worker limits, flight-controller
+coordination, supported coordinate labels and real-time speed measurement.
+
+Autonav's additional swept-body collision checks and reactive route validation
+use [Baritone's elytra collision checking](https://github.com/cabaletta/baritone/blob/3ddc8652adaae1500e920d82e26026707a921566/src/main/java/baritone/process/elytra/ElytraBehavior.java)
+as a design reference. No Baritone source or binary is included by these changes;
+Baritone remains an optional external integration.

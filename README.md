@@ -27,6 +27,11 @@ This branch contains the upcoming **0.3.0** changes. Build from source to use th
 - **Find stashes.** Search Area moves you through a rectangle or a spiral. Better Stash Finder saves every chest it finds to CSV and JSON files.
 - **Follow trails.** Old Chunk Notifier tells you when you reach chunks from an older Minecraft version, where players were long ago. TrailFollower and Trail Maker follow a trail for you.
 - **Use Meteor flight while following trails.** TrailFollower can enable Meteor's built-in ElytraFly with your existing settings, and restores only the activation state it owns.
+- **Fly with a controlled speed ramp.** VolytraFly brings Volizray's 6b6t flight module, navigation, avoidance and HUDs into FMod. Its default requested ceiling approaches 300 blocks/s; live server acceptance must be tested.
+- **Scout a new base location.** BaseScout continuously checks received chunks, reads optional XaeroPlus history, and avoids private per-server exclusions. Follow its live HUD and local chat reports; use `.bs start`, `.bs hud` and `.bs next` without opening a menu.
+- **Move supplies.** StashMover loads filled shulkers from marked containers, travels through manual stasis recalls or Tpa, verifies unloading, then returns empty by `/kill` and bed respawn. Empty route trials are required first; PearlLoader provides local controls for the destination operator.
+- **Find stored items.** ChestTracker remembers opened containers, ChestIndex checks reachable storage, ShulkerOverview previews box contents, and DubCounter counts loaded storage and capacity.
+- **Keep records and prepare supplies.** SignHistorian records observed sign changes, SignatureSign fills sign templates, StashBrander renames items through an anvil, and RoadTrip monitors travel progress and optional logout conditions.
 - **Conceal coordinate displays.** Coord Hider can hide coordinates or show securely generated synthetic coordinates in F3, the Meteor HUD and recognised text. Actual movement and saved data stay unchanged.
 - **Get alerts.** Auto Log Plus logs you out in more situations. Discord Notifs sends messages to your own Discord webhook.
 - **Move with commands.** `.tp`, `.autoclip`, `.shclip` and `.dclip` teleport you short distances or through blocks.

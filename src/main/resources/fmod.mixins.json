@@ -3,6 +3,11 @@
   "package": "addon.fmod.mixin",
   "compatibilityLevel": "JAVA_25",
   "client": [
+    "ClientPlayerInteractionManagerMixin",
+    "ShulkerOverviewMixin",
+    "AnvilScreenAccessor",
+    "SignEditScreenAccessor",
+    "LegacyStashMoverNameMixin",
     "DebugCoordinatesMixin",
     "DebugPositionMixin",
     "MeteorCoordinateHudMixin",

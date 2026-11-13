@@ -31,3 +31,7 @@ bin/
 # fabric
 
 run/
+
+# Private, per-server coordinate exclusions; never package or commit these files.
+**/base-scout-private/
+**/fmod-private/
