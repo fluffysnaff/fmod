@@ -85,6 +85,7 @@ public class FMod extends MeteorAddon {
         Commands.add(new StashMoverCommand());
         Commands.add(new RoadTripCommand());
         Commands.add(new SignHistoryCommand());
+        Commands.add(new VolytraNavCommand());
     }
 
 }

@@ -10,6 +10,7 @@ public final class NavigationProgress {
     public void reset() { anchor = null; sampledAt = activeNanos = stalledNanos = 0; }
     public void pause(long now) { sampledAt = now; }
     public long activeNanos() { return activeNanos; }
+    public double stalledSeconds() { return stalledNanos / 1_000_000_000.0; }
 
     public double sample(long now, Point position) {
         if (anchor == null) { anchor = position; sampledAt = now; return 0; }

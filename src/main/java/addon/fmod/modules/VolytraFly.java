@@ -19,6 +19,8 @@ import addon.fmod.modules.CoordHider;
 import addon.fmod.volytra.FlightEnvelope;
 import addon.fmod.volytra.autonav.WaypointProgress;
 import addon.fmod.volytra.autonav.NavigationProgress;
+import addon.fmod.volytra.autonav.AutonavDiagnostics;
+import net.fabricmc.loader.api.FabricLoader;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.systems.config.Config;
 import meteordevelopment.meteorclient.systems.modules.Modules;
@@ -79,6 +81,10 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 import java.util.Random;
+import java.util.Map;
+import java.util.LinkedHashMap;
+import java.util.HexFormat;
+import java.security.MessageDigest;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -92,6 +98,15 @@ public class VolytraFly extends Module {
     private final SettingGroup sgAutopilot = settings.createGroup("Autopilot", false);
     private final SettingGroup sgAutohighway = settings.createGroup("Autohighway", false);
     private final SettingGroup sgAutonav = settings.createGroup("Autonav", false);
+    private final SettingGroup sgDiagnostics = settings.createGroup("Autonav diagnostics", false);
+    private final Setting<Boolean> diagnosticLogging = sgDiagnostics.add(new BoolSetting.Builder()
+        .name("diagnostic-logging").description("Save bounded local Autonav logs. Use .vnav snapshot when stuck; no uploads.")
+        .defaultValue(true).onChanged(value -> refreshAutonavDiagnostics()).build());
+    private final Setting<Boolean> diagnosticAbsolute = sgDiagnostics.add(new BoolSetting.Builder()
+        .name("diagnostic-absolute-coordinates").description("Include real positions and destinations in private logs. Coord Hider does not redact files.")
+        .defaultValue(false).onChanged(value -> refreshAutonavDiagnostics()).build());
+    private final ButtonSetting diagnosticSnapshot = sgDiagnostics.add(new ButtonSetting(
+        "diagnostic-snapshot", "Capture nearby blocks and print the log path", "Save diagnostic snapshot", () -> true));
     private final SettingGroup sgOverdrive = settings.createGroup("Overdrive", false);
     private final SettingGroup sgMapping = settings.createGroup("Mapping", false);
     private final SettingGroup sgBuildingMode = settings.createGroup("Building Mode", false);
@@ -1137,6 +1152,17 @@ public class VolytraFly extends Module {
     private Vec3 mapRecoveryOrigin;
     private long mapRecoveryStarted;
     private boolean mapRecoveryRequested, mapRelocating, mapPaused;
+    private final AutonavDiagnostics navDiagnostics = new AutonavDiagnostics(
+        MeteorClient.FOLDER.toPath().resolve("fmod-private/autonav-diagnostics"), VolytraFly::diagnosticBuildIdentity);
+    private AutonavDiagnostics.Session diagnosticSession;
+    private AutonavDiagnostics.Session diagnosticIncidentSession;
+    private Object diagnosticWorld;
+    private boolean diagnosticActive;
+    private boolean diagnosticBlockedByChunks, diagnosticBlockedByNoCrash;
+    private long diagnosticSampleAt, diagnosticSearchAt, diagnosticCorrectionAt, diagnosticInvalidationAt, diagnosticFailureAt, diagnosticManualAt, diagnosticSequence;
+    private long diagnosticSearches, diagnosticClippedMoves, diagnosticInvalidations;
+    private String diagnosticState = "";
+    private AutonavDiagnostics.Coordinates diagnosticRequested, diagnosticAllowed;
     private final XaeroMapClicks mapClicks = new XaeroMapClicks();
     // How far from lava / water the route planner and the straight-line check keep the player's hitbox
     private static final double MAP_LAVA_MARGIN = 1.5;
@@ -1187,6 +1213,212 @@ public class VolytraFly extends Module {
 
     public VolytraFly() {
         super(FMod.CATEGORY, "volytra-fly", "Specifically designed to maximise elytrafly capabilities and speed on 6b6t");
+        diagnosticSnapshot.action = this::saveAutonavSnapshot;
+    }
+
+    private static Map<String, Object> diagnosticBuildIdentity() {
+        var build = new LinkedHashMap<String, Object>();
+        for (String id : new String[]{"fmod", "minecraft", "meteor-client", "baritone", "xaeroplus"}) {
+            build.put(id + "_version", FabricLoader.getInstance().getModContainer(id)
+                .map(mod -> mod.getMetadata().getVersion().getFriendlyString()).orElse("absent"));
+        }
+        build.put("java_version", System.getProperty("java.version", "unknown"));
+        try {
+            var digest = MessageDigest.getInstance("SHA-256");
+            for (Class<?> type : new Class<?>[]{VolytraFly.class, AutonavPlanner.class, NavigationProgress.class, WaypointProgress.class, FlightEnvelope.class, AutonavDiagnostics.class}) {
+                try (var input = type.getResourceAsStream(type.getSimpleName() + ".class")) {
+                    if (input == null) throw new java.io.IOException();
+                    digest.update(input.readAllBytes());
+                }
+            }
+            build.put("navigation_code_sha256", HexFormat.of().formatHex(digest.digest()));
+        } catch (Exception error) { build.put("navigation_code_sha256", "unavailable"); }
+        return Map.copyOf(build);
+    }
+
+    private void refreshAutonavDiagnostics() {
+        if (navDiagnostics == null) return;
+        endAutonavDiagnostics("logging_configuration_changed");
+        if (diagnosticLogging.get() && autonavActive && mc.player != null && mc.level != null) beginAutonavDiagnostics();
+    }
+
+    private void beginAutonavDiagnostics() {
+        if (!diagnosticLogging.get() || mc.player == null || mc.level == null) return;
+        Vec3 pos = mc.player.position();
+        var metadata = new LinkedHashMap<String,Object>();
+        metadata.put("dimension",mc.level.dimension().identifier().toString());
+        metadata.put("configuration",diagnosticConfiguration());
+        if (diagnosticSession != null) metadata.put("previous_log",diagnosticSession.file().getFileName().toString());
+        diagnosticSession = navDiagnostics.begin(new AutonavDiagnostics.Coordinates(pos.x(), pos.y(), pos.z()), diagnosticAbsolute.get(), Map.copyOf(metadata));
+        diagnosticWorld = mc.level;
+        diagnosticActive = true;
+        diagnosticSampleAt = diagnosticSearchAt = diagnosticCorrectionAt = 0;
+        diagnosticSearches = diagnosticClippedMoves = diagnosticInvalidations = 0;
+        diagnosticRequested = diagnosticAllowed = null;
+        diagnosticState = "";
+        traceAutonav("route_context", false, Map.of());
+        info("Local Autonav diagnostics are on. Use .vnav snapshot when stuck, or .vnav log for the file path.");
+    }
+
+    private void endAutonavDiagnostics(String reason) {
+        if (!diagnosticActive) return;
+        traceAutonav(reason, false, Map.of());
+        diagnosticActive = false;
+        diagnosticWorld = null;
+    }
+
+    private Map<String, Object> diagnosticConfiguration() {
+        return Map.ofEntries(Map.entry("horizontal_cap", horizontalSpeed.get()), Map.entry("start_speed", startSpeed.get()),
+            Map.entry("vertical_cap", verticalSpeed.get()), Map.entry("arrival_radius", autonavArrivalRadius.get()),
+            Map.entry("intelligence", autonavIntelligence.get().name()), Map.entry("no_crash_preference", noCrash.get()),
+            Map.entry("no_unloaded_chunks", dontGoIntoUnloadedChunks.get()), Map.entry("mapping", mappingMode.get()),
+            Map.entry("mapping_radius", mappingRenderRadius.get()), Map.entry("avoid_lava", autonavAvoidLava.get()),
+            Map.entry("avoid_water", autonavAvoidWater.get()), Map.entry("prioritise_highways", autonavPrioritiseHighways.get()),
+            Map.entry("bypass", bypassMode.get()), Map.entry("overdrive", overdrive.get()),
+            Map.entry("height_limit_enabled", limitMaxHeight.get()), Map.entry("configured_height_limit", maxHeight.get()));
+    }
+
+    private AutonavDiagnostics.Coordinates diagnosticPosition(Vec3 point) {
+        return diagnosticSession.position(point.x(), point.y(), point.z());
+    }
+
+    private Map<String, Object> diagnosticSnapshotData(boolean terrain) {
+        if (mc.player == null || mc.level == null || mc.level != diagnosticWorld) return Map.of("context_available", false);
+        Player player = mc.player;
+        Vec3 pos = player.position();
+        var data = new LinkedHashMap<String, Object>();
+        data.put("configuration", diagnosticConfiguration());
+        data.put("dimension", mc.level.dimension().identifier().toString());
+        data.put("position", diagnosticPosition(pos));
+        data.put("block_fraction", new AutonavDiagnostics.Coordinates(pos.x()-Math.floor(pos.x()), pos.y()-Math.floor(pos.y()), pos.z()-Math.floor(pos.z())));
+        data.put("chunk_offset", Map.of("x",pos.x()-Math.floor(pos.x()/16)*16,"z",pos.z()-Math.floor(pos.z()/16)*16));
+        data.put("velocity", new AutonavDiagnostics.Coordinates(player.getDeltaMovement().x(), player.getDeltaMovement().y(), player.getDeltaMovement().z()));
+        data.put("controller_movement", new AutonavDiagnostics.Coordinates(velX,velY,velZ));
+        AABB box = player.getBoundingBox();
+        data.put("body_size", new AutonavDiagnostics.Coordinates(box.getXsize(), box.getYsize(), box.getZsize()));
+        data.put("body_clearance", HIGHWAY_BLOCK_CLEARANCE);
+        data.put("gliding", player.isFallFlying()); data.put("pose", player.getPose().name());
+        data.put("on_ground", player.onGround()); data.put("horizontal_collision", player.horizontalCollision);
+        data.put("alive",player.isAlive());
+        var chest = player.getItemBySlot(EquipmentSlot.CHEST);
+        data.put("wearing_glider",chest.has(DataComponents.GLIDER));
+        data.put("elytra_durability_remaining",chest.isEmpty()?0:Math.max(0,chest.getMaxDamage()-chest.getDamageValue()));
+        data.put("vertical_collision", player.verticalCollision); data.put("in_water", player.isInWater()); data.put("in_lava", player.isInLava());
+        data.put("screen", mc.gui.screen() == null ? "none" : mc.gui.screen().getClass().getSimpleName());
+        data.put("game_paused", mc.isPaused()); data.put("fps", mc.getFps());
+        data.put("goal", diagnosticPosition(new Vec3(mapDestX, mapCruiseY, mapDestZ)));
+        data.put("goal_distance", Math.hypot(mapDestX-pos.x(),mapDestZ-pos.z()));
+        data.put("active", autonavActive); data.put("paused", mapPaused); data.put("detouring", mapDetouring);
+        data.put("no_route", mapNoRoute); data.put("relocating", mapRelocating); data.put("recovery_requested", mapRecoveryRequested);
+        data.put("mapping_waiting", mappingWaitingForChunks); data.put("avoidance_steering", avoidanceSteering);
+        data.put("last_move_stopped_for_unloaded_chunk",diagnosticBlockedByChunks);
+        data.put("last_move_stopped_by_no_crash",diagnosticBlockedByNoCrash);
+        data.put("movement_keys",Map.of("forward",mc.options.keyUp.isDown(),"back",mc.options.keyDown.isDown(),
+            "left",mc.options.keyLeft.isDown(),"right",mc.options.keyRight.isDown(),"jump",mc.options.keyJump.isDown(),"sneak",mc.options.keyShift.isDown()));
+        var otherMovement = new ArrayList<String>();
+        for(String name:new String[]{"elytra-fly","flight","packet-fly","trail-follower","search-area","timer"}) {
+            Module other=Modules.get().get(name);if(other!=null&&other.isActive())otherMovement.add(name);
+        }
+        data.put("other_movement_modules",List.copyOf(otherMovement));
+        data.put("no_crash_effective", isNoCrashEffective()); data.put("position_corrections", positionCorrections.get());
+        data.put("searches", diagnosticSearches); data.put("invalidations", diagnosticInvalidations); data.put("clipped_moves", diagnosticClippedMoves);
+        data.put("stationary_seconds", mapProgress.stalledSeconds());
+        if (mapRecoveryOrigin != null) {
+            data.put("recovery_origin", diagnosticPosition(mapRecoveryOrigin));
+            data.put("recovery_elapsed_ms", (mapProgress.activeNanos()-mapRecoveryStarted)/1_000_000);
+        }
+        if (diagnosticRequested != null) data.put("last_clipped_requested", diagnosticRequested);
+        if (diagnosticAllowed != null) data.put("last_clipped_allowed", diagnosticAllowed);
+        if (highwaySteerTarget != null) data.put("target", diagnosticPosition(highwaySteerTarget));
+        data.put("route_index", mapRouteIndex); data.put("route_size", mapRouteNodes.size());
+        data.put("route_preview", mapRouteNodes.stream().skip(Math.max(0,mapRouteIndex)).limit(32).map(this::diagnosticPosition).toList());
+        if (mapRouteRequest != null) data.put("pending_search", Map.of("id", mapRouteRequest.diagnosticId,
+            "generation", mapRouteRequest.generation, "done", mapRouteRequest.done, "recovery", mapRouteRequest.recovery,
+            "age_ms", (System.nanoTime()-mapRouteRequest.startedNanos)/1_000_000));
+        if (mapRouteExecutor instanceof ThreadPoolExecutor worker) data.put("search_queue", worker.getQueue().size());
+        var loaded = new ArrayList<Map<String,Object>>();
+        int chunkX = (int)Math.floor(pos.x()) >> 4, chunkZ = (int)Math.floor(pos.z()) >> 4;
+        for (int dx=-2;dx<=2;dx++) for(int dz=-2;dz<=2;dz++) loaded.add(Map.of("dx",dx,"dz",dz,"loaded",mc.level.getChunkSource().hasChunk(chunkX+dx,chunkZ+dz)));
+        data.put("nearby_chunks", List.copyOf(loaded));
+        if (terrain) {
+            var blocks = new ArrayList<Map<String,Object>>();
+            BlockPos origin = player.blockPosition();
+            for(int x=-3;x<=3;x++) for(int y=-2;y<=2;y++) for(int z=-3;z<=3;z++) {
+                BlockPos at = origin.offset(x,y,z);
+                boolean received = mc.level.getChunkSource().hasChunk(at.getX() >> 4, at.getZ() >> 4);
+                var state = received ? mc.level.getBlockState(at) : null;
+                if (state != null && state.isAir()) continue;
+                blocks.add(Map.of("dx",x,"dy",y,"dz",z,"state",received ? state.toString() : "unloaded"));
+            }
+            data.put("terrain_frame", "offsets_from_current_player_block; received_air_omitted; no_block_entity_data");
+            data.put("nearby_blocks", List.copyOf(blocks));
+        }
+        return Map.copyOf(data);
+    }
+
+    private void traceAutonav(String event, boolean terrain, Map<String, Object> extra) {
+        if (!diagnosticActive) return;
+        if (event.equals("recovery_begin") || event.equals("route_paused") || event.equals("manual_snapshot")) diagnosticIncidentSession = diagnosticSession;
+        try {
+            var data = new LinkedHashMap<String,Object>(diagnosticSnapshotData(terrain));
+            data.putAll(extra);
+            navDiagnostics.record(diagnosticSession, event, Map.copyOf(data), !event.equals("sample"));
+        } catch (RuntimeException error) {
+            navDiagnostics.record(diagnosticSession, "capture_failed", Map.of("error_type",error.getClass().getSimpleName()), true);
+        }
+    }
+
+    private void tickAutonavDiagnostics() {
+        long now = System.nanoTime();
+        if (now-diagnosticFailureAt >= TimeUnit.SECONDS.toNanos(10)) {
+            String failure = navDiagnostics.takeFailure();
+            if (failure != null) { diagnosticFailureAt = now; warning("%s", failure); }
+        }
+        if (!diagnosticActive) return;
+        if (now-diagnosticSampleAt < TimeUnit.SECONDS.toNanos(mapPaused ? 5 : 1)) return;
+        diagnosticSampleAt = now;
+        boolean arrived = mc.player != null && Math.hypot(mapDestX-mc.player.getX(),mapDestZ-mc.player.getZ())<=autonavArrivalRadius.get();
+        String state = mapPaused ? "paused" : arrived ? "arrived" : mapRelocating ? "relocating" : mapNoRoute ? "no_route"
+            : mappingWaitingForChunks || diagnosticBlockedByChunks ? "waiting_chunks" : mc.player != null && !mc.player.isFallFlying() ? "not_gliding" : mapDetouring ? "detouring" : "direct";
+        boolean changed = !state.equals(diagnosticState);
+        diagnosticState = state;
+        traceAutonav(changed ? "state_changed" : "sample", false, Map.of("phase",state));
+    }
+
+    public void setAutonavDiagnostics(boolean enabled) { diagnosticLogging.set(enabled); }
+    public void printAutonavLog() {
+        info("Autonav diagnostics: %s; dropped records %d.", diagnosticLogging.get() ? "on" : "off", navDiagnostics.droppedRecords());
+        showAutonavLogPath(false);
+        if (diagnosticIncidentSession != null && diagnosticIncidentSession != diagnosticSession) info("Recent recovery log: %s",diagnosticIncidentSession.file());
+    }
+    public void copyAutonavLogPath() {
+        showAutonavLogPath(true);
+    }
+    private void showAutonavLogPath(boolean copy) {
+        var selected = copy && !diagnosticActive && diagnosticIncidentSession != null ? diagnosticIncidentSession : diagnosticSession;
+        var pending = selected == null ? navDiagnostics.latest() : navDiagnostics.flush(selected);
+        if (selected != null && selected != diagnosticSession && diagnosticSession != null) pending = pending.exceptionallyCompose(error -> navDiagnostics.flush(diagnosticSession));
+        pending.whenComplete((path,error) -> mc.execute(() -> {
+            if (error != null) { warning("Could not finish reading the diagnostic file. Check disk access or try again."); return; }
+            java.nio.file.Path destination = path == null ? navDiagnostics.directory() : path;
+            if (copy) { mc.keyboardHandler.setClipboard(destination.toString()); info("Copied the local diagnostic path."); }
+            else info("%s: %s", path == null ? "No route log yet; diagnostic folder" : "Local log",destination);
+        }));
+    }
+    public void saveAutonavSnapshot() {
+        if (!diagnosticLogging.get()) { warning("Diagnostics are off. Use .vnav log on before recording a snapshot."); return; }
+        long now = System.nanoTime();
+        if (now-diagnosticManualAt < TimeUnit.SECONDS.toNanos(1)) return;
+        diagnosticManualAt = now;
+        if (diagnosticActive) traceAutonav("manual_snapshot", true, Map.of());
+        var selected = diagnosticActive || diagnosticIncidentSession == null ? diagnosticSession : diagnosticIncidentSession;
+        var saved = navDiagnostics.snapshot(selected);
+        if (selected != null && selected != diagnosticSession && diagnosticSession != null) saved = saved.exceptionallyCompose(error -> navDiagnostics.snapshot(diagnosticSession));
+        saved.whenComplete((path, error) -> mc.execute(() -> {
+            if (error != null) warning("The diagnostic snapshot could not finish. Check .vnav log and local disk access, then retry.");
+            else if (path == null) warning("No route log yet. Start an Autonav route, then use .vnav snapshot.");
+            else info("Autonav diagnostics saved: %s", path);
+        }));
     }
 
     // Visuals helpers (kept as methods, not lambdas in the field initializers above, since those
@@ -1277,6 +1509,7 @@ public class VolytraFly extends Module {
 
     @Override
     public void onDeactivate() {
+        endAutonavDiagnostics("module_disabled");
         boolean restoreGear = activationAccepted;
         activationAccepted = false;
 
@@ -1320,6 +1553,7 @@ public class VolytraFly extends Module {
     @SuppressWarnings("unused") // called by the event bus
     @EventHandler
     private void onGameLeft(GameLeftEvent event) {
+        endAutonavDiagnostics("disconnect");
 
         releaseHorizontalKeys();
         releaseAvoidance();
@@ -1346,6 +1580,7 @@ public class VolytraFly extends Module {
     @SuppressWarnings("unused") // called by the event bus
     @EventHandler
     private void onPlayerMove(PlayerMoveEvent event) {
+        diagnosticBlockedByChunks = diagnosticBlockedByNoCrash = false;
         if (!canControlFlight()) { toggle(); return; }
         Player player = mc.player;
         ClientLevel world = mc.level;
@@ -1451,6 +1686,7 @@ public class VolytraFly extends Module {
             int chunkX = (int) Math.floor((player.getX() + velX) / 16.0);
             int chunkZ = (int) Math.floor((player.getZ() + velZ) / 16.0);
             if (dontGoIntoUnloadedChunks.get() && !world.getChunkSource().hasChunk(chunkX, chunkZ)) {
+                diagnosticBlockedByChunks = true;
                 // Don't reset acceleration/ramp state here - this fires every tick you're
                 // outrunning chunk loading, and a full zeroAcceleration() would stomp your
                 // ramped/held speed even though you never actually stopped moving. Just
@@ -1475,6 +1711,7 @@ public class VolytraFly extends Module {
             ClipContext raycastContext = new ClipContext(player.position(), new Vec3(lookAheadPos.x(), player.getY(), lookAheadPos.z()), ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, player);
             BlockHitResult hitResult = world.clip(raycastContext);
             if (hitResult.getType() == HitResult.Type.BLOCK) {
+                diagnosticBlockedByNoCrash = true;
                 assistantFlag(AssistantSituation.NO_CRASH);
                 ((IVec3) event.movement).meteor$set(0, velY, 0);
             }
@@ -1549,6 +1786,7 @@ public class VolytraFly extends Module {
 
         intendedDistanceLastTick = intendedDistanceAccum;
         intendedDistanceAccum = 0;
+        tickAutonavDiagnostics();
     }
 
     /** The minimum horizontal speed in use right now: the setting, or 1 while breaking a rubberband loop. */
@@ -1851,6 +2089,11 @@ public class VolytraFly extends Module {
             mc.execute(() -> {
                 if (!isActive() || mc.getConnection() == null || mc.getConnection().getConnection() != connection) return;
             positionCorrections.incrementAndGet();
+            long diagnosticNow = System.nanoTime();
+            if (diagnosticActive && diagnosticNow-diagnosticCorrectionAt >= TimeUnit.SECONDS.toNanos(1)) {
+                diagnosticCorrectionAt = diagnosticNow;
+                traceAutonav("server_correction", false, Map.of());
+            }
             Player player = mc.player;
             ClientLevel world = mc.level;
 
@@ -2751,6 +2994,8 @@ public class VolytraFly extends Module {
         ClientLevel world = mc.level;
         if (player == null || world == null) return;
 
+        endAutonavDiagnostics("route_replaced");
+
         resetMapRouteState();
         resetAutonavRamp();
         mapDestX = blockX + 0.5;
@@ -2762,6 +3007,7 @@ public class VolytraFly extends Module {
         mapCruiseY = Math.max(world.getMinY() + 2, Math.min(flightCeiling(), player.getY()));
         mapDetouring = false;
         autonavActive = true;
+        beginAutonavDiagnostics();
 
         assistantMarkActive();
         assistantSay("map-set-" + blockX + "," + blockZ, false, true, "Got it! Flying to " + blockX + ", " + blockZ);
@@ -2770,6 +3016,7 @@ public class VolytraFly extends Module {
     }
 
     private void cancelAutonav() {
+        endAutonavDiagnostics("route_cancelled");
         boolean wasActive = autonavActive;
         resetAutonavState();
         releaseHighwayKeys();
@@ -2827,6 +3074,7 @@ public class VolytraFly extends Module {
     }
 
     private void resetAutonavState() {
+        endAutonavDiagnostics("route_reset");
         autonavActive = false;
         autonavDestX = 0;
         autonavDestZ = 0;
@@ -2875,6 +3123,7 @@ public class VolytraFly extends Module {
         if (mapRecoveryOrigin != null) {
             if (pos.distanceToSqr(mapRecoveryOrigin) >= 64) {
                 mapRecoveryOrigin = null;
+                traceAutonav("recovery_resumed", false, Map.of());
                 info("Autonav has cleared the stalled area and resumed the route.");
             } else if (mapProgress.activeNanos() - mapRecoveryStarted >= TimeUnit.SECONDS.toNanos(20)) {
                 pauseAutonav("No safe recovery completed within 20 seconds.");
@@ -2888,6 +3137,7 @@ public class VolytraFly extends Module {
                 warning("Autonav is stalled near terrain; planning a short, verified escape.");
             }
             mapRecoveryRequested = true;
+            traceAutonav("recovery_begin", true, Map.of());
             mapDetouring = true;
             mapClearStreak = 0;
             clearMapRoute();
@@ -2900,6 +3150,7 @@ public class VolytraFly extends Module {
         mapPaused = true;
         mapNoRoute = true;
         mapRecoveryRequested = false;
+        traceAutonav("route_paused", true, Map.of("reason",reason));
         releaseHighwayKeys();
         if (mc.player != null) mc.player.setDeltaMovement(Vec3.ZERO);
         warning("Autonav paused: %s Use Go to retry, or the cancel bind / movement keys to take over.", reason);
@@ -3002,6 +3253,12 @@ public class VolytraFly extends Module {
                 advanceMapRouteIndex(pos);
                 target = pickMapWaypoint(player, world, pos);
                 if (target == null && mapRouteIndex < mapRouteNodes.size() - 1) {
+                    diagnosticInvalidations++;
+                    long diagnosticNow = System.nanoTime();
+                    if (diagnosticNow-diagnosticInvalidationAt >= TimeUnit.SECONDS.toNanos(1)) {
+                        diagnosticInvalidationAt = diagnosticNow;
+                        traceAutonav("route_invalidated", false, Map.of("reason","no_reachable_waypoint"));
+                    }
                     clearMapRoute();
                     submitMapPlan(world, player, pos);
                 }
@@ -3176,6 +3433,9 @@ public class VolytraFly extends Module {
     }
 
     private void cancelMapSearch() {
+        if (diagnosticActive && mapRouteRequest != null && mapRouteRequest.traceSession == diagnosticSession && !mapRouteRequest.done) {
+            traceAutonav("search_cancel_requested", false, Map.of("search_id",mapRouteRequest.diagnosticId));
+        }
         if (mapRouteTask != null) { mapRouteTask.cancel(true); mapRouteTask = null; }
         if (mapRouteExecutor instanceof ThreadPoolExecutor worker) worker.purge();
     }
@@ -3232,6 +3492,13 @@ public class VolytraFly extends Module {
 
     /** One route search handed to the background thread. The worker fills in status and nodes, then sets done. */
     private static final class MapRouteRequest {
+        long diagnosticId;
+        final long startedNanos = System.nanoTime();
+        long finishedNanos;
+        int expanded;
+        String failureType;
+        List<String> failureFrames = List.of();
+        AutonavDiagnostics.Session traceSession;
         final int generation;
         final ClientLevel world;
         final Player player;
@@ -3273,10 +3540,19 @@ public class VolytraFly extends Module {
         MapRouteRequest request = new MapRouteRequest(mapRouteGeneration.get(), world, player, pos, mapGoalX, mapGoalZ,
             mapGoalRadius, mapRecoveryRequested, budget);
         mapRouteRequest = request;
+        request.diagnosticId = ++diagnosticSequence;
+        diagnosticSearches++;
+        long diagnosticNow = System.nanoTime();
+        if (diagnosticActive && (request.recovery || diagnosticNow-diagnosticSearchAt >= TimeUnit.MILLISECONDS.toNanos(250))) {
+            diagnosticSearchAt = diagnosticNow;
+            request.traceSession = diagnosticSession;
+            traceAutonav("search_submitted", false, Map.of("search_id",request.diagnosticId,"node_budget",budget,"recovery",request.recovery));
+        }
         try {
             mapRouteTask = mapRouteExecutor.submit(() -> runMapPlan(request));
         } catch (RejectedExecutionException e) {
             mapRouteRequest = null;
+            if (request.traceSession == diagnosticSession) traceAutonav("search_rejected", false, Map.of("search_id",request.diagnosticId,"reason","worker_busy"));
         }
     }
 
@@ -3296,6 +3572,7 @@ public class VolytraFly extends Module {
                 if (out.status != AutonavPlanner.Status.SEALED) best = out;
             }
             request.status = best.status;
+            request.expanded = best.expanded;
             if (best.status != AutonavPlanner.Status.SEALED) {
                 // An escape route goes through cells the smoothing would call blocked, so it is left as it is
                 List<int[]> cells = best.status == AutonavPlanner.Status.ESCAPING ? best.cells : AutonavPlanner.smooth(grid, best.cells, 64);
@@ -3305,9 +3582,13 @@ public class VolytraFly extends Module {
                 if (!nodes.isEmpty()) nodes.set(0, request.start);
                 request.nodes = nodes;
             }
-        } catch (Throwable ignored) {
+        } catch (Throwable error) {
+            request.failureType = error.getClass().getSimpleName();
+            request.failureFrames = java.util.Arrays.stream(error.getStackTrace()).limit(12)
+                .map(frame -> frame.getClassName()+"."+frame.getMethodName()+":"+frame.getLineNumber()).toList();
             // The world can change under a background read. No route this time; the next cadence tries again.
         } finally {
+            request.finishedNanos = System.nanoTime();
             request.done = true;
         }
     }
@@ -3317,6 +3598,16 @@ public class VolytraFly extends Module {
         MapRouteRequest request = mapRouteRequest;
         if (request == null || !request.done) return;
         mapRouteRequest = null;
+        if (diagnosticActive && request.traceSession == diagnosticSession) {
+            var result = new LinkedHashMap<String,Object>();
+            result.put("search_id",request.diagnosticId); result.put("status",request.status == null ? "failed" : request.status.name());
+            result.put("duration_ms",(request.finishedNanos-request.startedNanos)/1_000_000); result.put("expanded",request.expanded);
+            result.put("generation",request.generation); result.put("current_generation",mapRouteGeneration.get());
+            result.put("start",diagnosticPosition(request.start)); result.put("search_goal",diagnosticPosition(new Vec3(request.destX,request.start.y(),request.destZ)));
+            if (request.nodes != null) result.put("result_preview",request.nodes.stream().limit(32).map(this::diagnosticPosition).toList());
+            if (request.failureType != null) { result.put("error_type",request.failureType); result.put("stack",request.failureFrames); }
+            traceAutonav("search_completed", false, Map.copyOf(result));
+        }
         if (request.generation != mapRouteGeneration.get()
             || request.world != mc.level || request.player != mc.player) return;
         if (request.status == null) {
@@ -3820,6 +4111,7 @@ public class VolytraFly extends Module {
         mapInLava = autonavActive && mapTouchesAvoidedFluid(world, player, x, y, z, true);
         mapInWater = autonavActive && mapTouchesAvoidedFluid(world, player, x, y, z, false);
         double horizontalBefore = Math.hypot(velX, velZ);
+        double diagnosticX = velX, diagnosticY = velY, diagnosticZ = velZ;
 
         double allowedY = clampHighwayAxis(world, player, x, y, z, 1, velY, start, hardStart);
         y += allowedY;
@@ -3840,6 +4132,11 @@ public class VolytraFly extends Module {
         velX = allowedX;
         velY = allowedY;
         velZ = allowedZ;
+        if (diagnosticActive && Math.abs(diagnosticX-velX)+Math.abs(diagnosticY-velY)+Math.abs(diagnosticZ-velZ)>1e-6) {
+            diagnosticClippedMoves++;
+            diagnosticRequested = new AutonavDiagnostics.Coordinates(diagnosticX,diagnosticY,diagnosticZ);
+            diagnosticAllowed = new AutonavDiagnostics.Coordinates(velX,velY,velZ);
+        }
 
         // A hit that costs speed drops the ramp to what was kept
         double horizontalAfter = Math.hypot(velX, velZ);
