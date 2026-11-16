@@ -3,6 +3,12 @@
   "package": "addon.fmod.mixin",
   "compatibilityLevel": "JAVA_25",
   "client": [
+    "UIUtilsScreenMixin",
+    "UIUtilsInputMixin",
+    "UIUtilsContainerAccessor",
+    "UIUtilsChatMixin",
+    "UIUtilsSignMixin",
+    "UIUtilsResourcePackMixin",
     "ClientPlayerInteractionManagerMixin",
     "ShulkerOverviewMixin",
     "AnvilScreenAccessor",

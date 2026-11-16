@@ -13,6 +13,7 @@ import meteordevelopment.meteorclient.events.world.TickEvent;
 import meteordevelopment.meteorclient.settings.*;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.systems.modules.Modules;
+import meteordevelopment.meteorclient.systems.modules.movement.Flight;
 import meteordevelopment.meteorclient.systems.modules.movement.elytrafly.ElytraFly;
 import meteordevelopment.meteorclient.utils.player.Rotations;
 import meteordevelopment.meteorclient.utils.misc.input.Input;
@@ -93,10 +94,15 @@ public class TrailFollower extends Module
         .name("meteor-elytra-fly")
         .description("Enables Meteor's ElytraFly for yaw following, using its existing settings. Restores it only if TrailFollower enabled it.")
         .defaultValue(true)
-        .onChanged(enabled -> {
-            if (!enabled) releaseFlight();
-            else if (isActive() && this.started) startFlight();
-        })
+        .onChanged(enabled -> updateFlight(true, enabled))
+        .build()
+    );
+
+    public final Setting<Boolean> meteorFlight = sgGeneral.add(new BoolSetting.Builder()
+        .name("meteor-flight")
+        .description("Uses Meteor's normal Flight for yaw following without an elytra. Preserves its settings and disables the meteor-elytra-fly option.")
+        .defaultValue(false)
+        .onChanged(enabled -> updateFlight(false, enabled))
         .build()
     );
 
@@ -283,7 +289,7 @@ public class TrailFollower extends Module
 
     boolean started = false;
 
-    private ElytraFly managedFlight;
+    private Module managedFlight;
     private boolean forwardHeld;
 
     @Override
@@ -315,10 +321,34 @@ public class TrailFollower extends Module
         startFlight();
     }
 
+    private void updateFlight(boolean elytra, boolean enabled) {
+        Setting<Boolean> other = elytra ? meteorFlight : meteorElytraFly;
+        if (enabled && other.get()) {
+            other.set(false);
+            return;
+        }
+        releaseFlight();
+        if (isActive() && started) startFlight();
+    }
+
+    private Module selectedFlight() {
+        if (meteorFlight.get()) return Modules.get().get(Flight.class);
+        return meteorElytraFly.get() ? Modules.get().get(ElytraFly.class) : null;
+    }
+
+    private boolean competingFlightActive() {
+        return meteorFlight.get() ? Modules.get().isActive(ElytraFly.class) : Modules.get().isActive(Flight.class);
+    }
+
     private void startFlight() {
-        if (!meteorElytraFly.get() || followMode != FollowMode.YAWLOCK || managedFlight != null) return;
-        ElytraFly flight = Modules.get().get(ElytraFly.class);
-        if (flight != null && !flight.isActive()) {
+        if (followMode != FollowMode.YAWLOCK || managedFlight != null) return;
+        Module flight = selectedFlight();
+        if (flight == null) return;
+        if (competingFlightActive()) {
+            warning("Disable the other Meteor flight controller before using %s with TrailFollower.", flight.title);
+            return;
+        }
+        if (!flight.isActive()) {
             flight.toggle();
             if (flight.isActive()) managedFlight = flight;
         }
@@ -326,7 +356,7 @@ public class TrailFollower extends Module
 
     private void releaseFlight() {
         setForward(false);
-        ElytraFly flight = managedFlight;
+        Module flight = managedFlight;
         managedFlight = null;
         if (flight != null && flight.isActive()) flight.toggle();
     }
@@ -335,7 +365,9 @@ public class TrailFollower extends Module
     private void onActiveModulesChanged(ActiveModulesChangedEvent event) {
         // Manual disable relinquishes ownership, including a subsequent manual re-enable.
         if (managedFlight != null && !managedFlight.isActive()) managedFlight = null;
-        if (forwardHeld && !Modules.get().isActive(ElytraFly.class)) setForward(false);
+        if (managedFlight != null && competingFlightActive()) releaseFlight();
+        Module selected = selectedFlight();
+        if (forwardHeld && (selected == null || !selected.isActive() || competingFlightActive())) setForward(false);
     }
 
     private void setForward(boolean pressed) {
@@ -404,8 +436,9 @@ public class TrailFollower extends Module
         if (mc.player == null || mc.level == null) { setForward(false); return; }
         if (!started) startFollowing();
         if (!started || !isActive()) return;
-        setForward(meteorElytraFly.get() && followMode == FollowMode.YAWLOCK
-            && Modules.get().isActive(ElytraFly.class) && mc.player.isFallFlying() && mc.gui.screen() == null);
+        Module flight = selectedFlight();
+        setForward(followMode == FollowMode.YAWLOCK && flight != null && flight.isActive() && !competingFlightActive()
+            && (meteorFlight.get() || mc.player.isFallFlying()) && mc.gui.screen() == null);
         if (followingTrail && System.currentTimeMillis() - lastFoundTrailTime > trailTimeout.get())
         {
             resetTrail();

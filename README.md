@@ -6,7 +6,7 @@
   <p>Stash hunting, travel and streaming tools for Meteor Client on Minecraft 26.3.</p>
 
   <p>
-    <a href="https://github.com/fluffysnaff/fmod/releases/tag/v0.2.0"><b>Download v0.2.0 (prerelease)</b></a>
+    <a href="https://github.com/fluffysnaff/fmod/releases/tag/v0.3.0"><b>Download v0.3.0 (prerelease)</b></a>
     &nbsp;|&nbsp;
     <a href="docs/FEATURES.md">All features</a>
     &nbsp;|&nbsp;
@@ -16,7 +16,7 @@
 
 FMod is an addon for [Meteor Client](https://meteorclient.com/), a Minecraft client mod. All of its modules are in the **FMod** category of Meteor's menu.
 
-This branch contains the upcoming **0.3.0** changes. Build from source to use them; the v0.2.0 prerelease has the previous module set and Hide-only coordinate protection.
+The **0.3.0 prerelease** adds scouting and container tools, VolytraFly, UI Utils, and randomized coordinate displays. See the [feature guide](docs/FEATURES.md) for settings and optional mods.
 
 ## Features
 
@@ -41,7 +41,7 @@ This branch contains the upcoming **0.3.0** changes. Build from source to use th
 </td>
 <td valign="top" width="193">
   <img src="docs/assets/readme/modules.png" width="193" alt="The current FMod module menu, including Base Scout, Stash Mover and Volytra Fly">
-  <p><small>0.3.0 development menu with optional mods installed.</small></p>
+  <p><small>0.3.0 development menu with optional mods installed; newer modules may not be pictured.</small></p>
 </td>
 </tr>
 </table>
@@ -49,7 +49,7 @@ This branch contains the upcoming **0.3.0** changes. Build from source to use th
 ## Install
 
 1. Install [Meteor Client](https://meteorclient.com/download) for Minecraft 26.3. You need Fabric Loader 0.19.5 or newer and Java 25 or newer.
-2. Download `fmod-<version>.jar` from the [v0.2.0 prerelease](https://github.com/fluffysnaff/fmod/releases/tag/v0.2.0) and put it in your `.minecraft/mods` folder.
+2. Download `fmod-0.3.0.jar` from the [v0.3.0 prerelease](https://github.com/fluffysnaff/fmod/releases/tag/v0.3.0) and put it in your `.minecraft/mods` folder.
 3. Start Minecraft with your Fabric profile. Press Right Shift to open Meteor's menu.
 
 The map and trail modules need Xaero's World Map, Xaero's Minimap and XaeroPlus. TrailFollower also needs Baritone. Without these mods, the modules that need them do not appear. See the [tested versions](docs/FEATURES.md#optional-mods).

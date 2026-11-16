@@ -16,7 +16,9 @@ These modules are ported from the `26.1.2` branch of [miles352/meteor-stashhunti
 | HighlightOldLava, VanityESP | Highlight old flowed lava, map art and banners. |
 | AutoPortal, AutoEXPPlus, NoJumpDelay | Build portals, repair equipment with experience, and remove the jump cooldown. |
 
-TrailFollower's **meteor-elytra-fly** option enables Meteor's built-in ElytraFly when it starts yaw-based following. Your configured ElytraFly mode and settings are preserved. Equip an elytra and start gliding; TrailFollower holds forward only while gliding with ElytraFly active and no screen open, then restores the current physical key state on release. It turns ElytraFly off on stop only if it enabled it; an already active module or one you manually re-enable remains under your control. Turn this option off to manage flight yourself. Nether Baritone following is unchanged.
+TrailFollower supports two mutually exclusive controllers for yaw-based following. **meteor-elytra-fly** (on by default) uses Meteor's built-in ElytraFly; equip an elytra and start gliding. **meteor-flight** uses Meteor's normal **Flight** module and needs no elytra or gliding. Enabling either option turns the other option off. Your selected Meteor module's mode and settings are preserved. TrailFollower holds forward while that controller is active and no screen is open, then restores the current physical key state on release. It turns the controller off on stop only if it enabled it; an already active module or one you manually re-enable remains under your control. It does not start both Meteor flight controllers together. Turn both options off to manage flight yourself. Nether Baritone following is unchanged; choose Advanced **flight-method: YAWLOCK** to use Meteor Flight there instead.
+
+FMod adds **no-unloaded-chunks** (on by default) to Meteor's normal **Flight → General** settings. It pauses horizontal movement before the player's swept body crosses into a chunk the client has not received, including chunks between the start and end of a fast move. Flight stays enabled and resumes as chunks load; vertical movement remains available. This applies to manual Flight and TrailFollower's **meteor-flight** option, with no optional-mod requirement for the guard itself. Existing unloaded overlaps can be exited, and extremely large movement sweeps are rejected to bound work per move. It does not guard teleports, vehicles, other flight modules, or server corrections.
 
 ## Optional mods
 
@@ -152,6 +154,18 @@ Both modes use the existing coverage switches:
 
 This is display protection, not complete location anonymity. The module does not change your player position, movement packets, route data or global Starscript values. Exports, logs, clipboard content and configured webhook messages keep real coordinates. Maps, world geometry, individual input fields and overlays using unrecognised formats can still reveal your location. Choose Hide if you prefer to suppress coordinates instead of displaying a fixed synthetic location.
 
+## UI Utils
+
+Enable **ui-utils** in the FMod category, open an inventory or container, and select **UI Utils** in the top-left corner. This is a native Minecraft 26.3 implementation of [Coderx-Gamer/ui-utils](https://github.com/Coderx-Gamer/ui-utils)'s debugging workflow. It needs no optional mods or separate UI-Utils installation. The packet editor runs inside Minecraft instead of opening a desktop window.
+
+- **Close without packet** hides the screen while retaining the client menu and leaving the server container open. **De-sync** submits a container-close packet while retaining the client menu.
+- **Send packets** blocks or permits container slot/button packets. Turning it off also discards delayed packets. **Delay packets** holds these packets in FIFO order; turning delay off flushes them. The queue holds at most **512** packets; further clicks are discarded with a warning. You can also flush or discard explicitly.
+- **Save GUI** retains one container screen in memory. Restore it with **V** by default (configurable as **restore-screen**) or `.ui-utils restore`. This deliberately reattaches the saved client menu; the server may have closed or replaced it. Saved screens and queued packets are cleared on disconnect, reconnect, or module disable and are never written to disk. Disabling never flushes packets.
+- **Fabricate packet** edits the sync ID, revision, slot, button, action and repeat count for container-click or container-button packets. Repeats are limited to **1–100** per submission and numeric fields must fit their wire types. Click packets use an empty changed-slot map and the current carried-stack hash without predicting local inventory changes. **Respect delay** controls queueing; sending off still blocks fabrication. Submission is not confirmation that a server accepted an action.
+- **Send queued + disconnect** submits the queue then disconnects immediately. Server processing and any race-dependent effects are not guaranteed. **Copy GUI title JSON** copies the original component, including formatting, to the clipboard.
+- Inventories, book screens and sign editors have a chat/command field. Focus it and press **Enter** to send; **Escape** releases its focus. `^toggleuiutils` or `.ui-utils controls` toggles the added controls. Sign editors also offer close without an update and disconnect buttons. The sleeping chat screen offers a client-only wake button.
+- On the multiplayer screen, **Bypass packs** acknowledges required resource-pack offers without downloading them. **Force deny** extends that behavior to optional packs while bypass is on. Both default off; the module must be enabled. Responses use the offered pack's UUID. This cannot guarantee that a server will allow you to remain connected.
+
 ## Other modules
 
 - **InstaMine** attempts to finish mining immediately when your current tool and effects give more than `0.5` block-breaking progress per tick, matching FMod's previous threshold. It sends sequenced start/stop mining actions and predicts the local removal; the server can reject or correct the break. Slower blocks use normal mining. Creative mode, game-mode/tool restrictions, air and unbreakable blocks keep normal behaviour. No optional mods are required.
@@ -168,6 +182,7 @@ The movement commands are based on [JorianWoltjer/LiveOverflowMod](https://githu
 | `.stashmover <action>` | `.sm` | Courier trials, shipments, area corners, status and stop. |
 | `.pearl-loader <action>` | `.pl`, `.pearlloader` | Mark and manually trigger a named operator trapdoor. |
 | `.chest-tracker [search <text>]` | `.ct`, `.chestindex` | Browse/search container records; also `status` and `rescan`. |
+| `.ui-utils [action]` | `.uiutils` | `restore`, `clear`, `flush`, `controls`, or `status` for the container debugging tools. |
 | `.signhistory` | `.shistory` | Browse observed sign history. |
 | `.roadtrip <action>` | `.rt` | Travel monitoring and current-dimension targets. |
 | `.volytra-nav snapshot` / `log` | `.vnav` | Capture local Autonav diagnostics, locate/copy the log, or switch recording on/off. |

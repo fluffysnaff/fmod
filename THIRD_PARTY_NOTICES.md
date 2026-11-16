@@ -69,3 +69,17 @@ Autonav's additional swept-body collision checks and reactive route validation
 use [Baritone's elytra collision checking](https://github.com/cabaletta/baritone/blob/3ddc8652adaae1500e920d82e26026707a921566/src/main/java/baritone/process/elytra/ElytraBehavior.java)
 as a design reference. No Baritone source or binary is included by these changes;
 Baritone remains an optional external integration.
+
+## UI Utils feature reference
+
+`modules/UIUtils.java`, `uiutils/`, the UIUtils mixins and command are native
+FMod implementations of the inventory/debugging workflow documented by
+[Coderx-Gamer/ui-utils](https://github.com/Coderx-Gamer/ui-utils), revision
+`4636370763e5c8472ee60a46f85f8a2d10ccd947` (UI-Utils 2.4.0 for Minecraft 1.21.7).
+Credit Coderx_Gamer and MrBreakNFix for the feature reference. No upstream source,
+assets, updater or binary is included in this implementation.
+
+That upstream revision declares CC BY-NC-SA 4.0 with additional distribution
+restrictions in its `LICENSE` and usage restrictions in `TERMS.md`. FMod's GPL
+declaration does not relicense that upstream work or grant permission to copy
+or redistribute it. The native FMod implementation uses GPL-3.0-only.
