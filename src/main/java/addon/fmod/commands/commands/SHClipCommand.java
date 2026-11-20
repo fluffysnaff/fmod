@@ -24,7 +24,7 @@ public class SHClipCommand extends Command {
                 mc.player.getLookAngle().multiply(1, 0, 1).normalize().scale(distance)
             );
 
-            WarpUtils.clipUpDown(targetPos);
+            WarpUtils.warpOver(targetPos, 5);
 
             return SINGLE_SUCCESS;
         }));

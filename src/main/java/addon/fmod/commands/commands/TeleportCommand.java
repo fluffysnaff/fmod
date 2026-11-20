@@ -23,7 +23,7 @@ public class TeleportCommand extends Command {
             int ticks =  IntegerArgumentType.getInteger(context, "ticks");
 
             mc.player.noPhysics = true;
-            WarpUtils.warpTo(pos, (ticks <= 0 ? 1 : ticks));
+            WarpUtils.warp(pos);
 
             return SINGLE_SUCCESS;
         })));

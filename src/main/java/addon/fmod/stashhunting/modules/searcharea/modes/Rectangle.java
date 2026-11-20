@@ -3,6 +3,9 @@ package addon.fmod.stashhunting.modules.searcharea.modes;
 import addon.fmod.stashhunting.modules.searcharea.SearchAreaMode;
 import addon.fmod.stashhunting.modules.searcharea.SearchArea;
 import addon.fmod.stashhunting.modules.searcharea.SearchAreaModes;
+import addon.fmod.stashhunting.modules.searcharea.VolytraRoutePilot;
+import java.util.ArrayList;
+import java.util.List;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.systems.modules.Modules;
 import meteordevelopment.meteorclient.systems.modules.misc.AutoReconnect;
@@ -22,6 +25,11 @@ public class Rectangle extends SearchAreaMode
     private PathingDataRectangle pd;
     private boolean goingToStart = true;
     private long startTime;
+
+    private boolean useVolytra;
+    private VolytraRoutePilot pilot;
+    private int lastSavedIndex = -1;
+    private boolean routeComplete;
 
     public Rectangle(SearchArea owner) {
         super(owner, SearchAreaModes.Rectangle);
@@ -51,13 +59,67 @@ public class Rectangle extends SearchAreaMode
                 searchArea.warning("Could not read saved rectangle; starting a new path.");
             }
         }
+
+        useVolytra = searchArea.flightController.get() == SearchArea.FlightController.VolytraFly;
+        if (useVolytra) {
+            pilot = new VolytraRoutePilot(buildCorners());
+            if (!pilot.available()) {
+                searchArea.error("VolytraFly module not found; falling back to keyboard control.");
+                useVolytra = false;
+            } else {
+                VolytraProgress vp = loadVolytraProgress();
+                pilot.start(vp != null ? vp.index : 0);
+                lastSavedIndex = pilot.index();
+                routeComplete = false;
+                if (!pilot.ready()) searchArea.warning("Enable VolytraFly and start gliding; Search Area will fly the route once it is on.");
+            }
+        }
     }
 
     @Override
     public void onDeactivate()
     {
+        if (useVolytra && pilot != null) {
+            if (routeComplete) clearVolytraProgress();
+            else saveVolytraProgress(searchArea.startPos.get().getX(), searchArea.startPos.get().getZ(), pilot.index());
+        }
+        if (pilot != null) pilot.stop();
         super.onDeactivate();
         super.saveToJson(goingToStart, pd);
+    }
+
+    private List<int[]> buildCorners() {
+        int x0 = searchArea.startPos.get().getX();
+        int z0 = searchArea.startPos.get().getZ();
+        int x1 = searchArea.targetPos.get().getX();
+        int z1 = searchArea.targetPos.get().getZ();
+        int step = searchArea.rowGap.get() * 16;
+        if (z1 < z0) step = -step;
+
+        List<int[]> corners = new ArrayList<>();
+        int z = z0;
+        boolean toTarget = true;
+        int guard = 0;
+        while ((step > 0 ? z <= z1 : z >= z1) && guard++ < 20000) {
+            int a = toTarget ? x0 : x1;
+            int b = toTarget ? x1 : x0;
+            corners.add(new int[]{a, z});
+            corners.add(new int[]{b, z});
+            toTarget = !toTarget;
+            z += step;
+        }
+        return corners;
+    }
+
+    private void completePath() {
+        setPressed(mc.options.keyUp, false);
+        if (pilot != null) pilot.stop();
+        searchArea.toggle();
+        if (searchArea.disconnectOnCompletion.get()) {
+            var autoReconnect = Modules.get().get(AutoReconnect.class);
+            if (autoReconnect.isActive()) autoReconnect.toggle();
+            mc.player.connection.handleDisconnect(new ClientboundDisconnectPacket(Component.literal("[Search Area] Path is complete")));
+        }
     }
 
     private void printRectangleEstimate()
@@ -78,6 +140,19 @@ public class Rectangle extends SearchAreaMode
     @Override
     public void onTick()
     {
+        if (useVolytra) {
+            if (pilot != null) {
+                boolean done = pilot.tick(mc);
+                int idx = pilot.index();
+                if (idx != lastSavedIndex) {
+                    lastSavedIndex = idx;
+                    saveVolytraProgress(searchArea.startPos.get().getX(), searchArea.startPos.get().getZ(), idx);
+                }
+                if (done) { routeComplete = true; completePath(); }
+            }
+            return;
+        }
+
         // autosave every 10 minutes in case of crashes
         if (System.nanoTime() - startTime > 6e11)
         {
@@ -105,15 +180,7 @@ public class Rectangle extends SearchAreaMode
         mc.player.setYRot(pd.yawDirection);
         if (Math.sqrt(mc.player.blockPosition().distToLowCornerSqr(pd.targetPos.getX(), mc.player.getY(), pd.targetPos.getZ())) < 20) // end of rectangle
         {
-            setPressed(mc.options.keyUp, false);
-//            path complete
-            searchArea.toggle();
-            if (searchArea.disconnectOnCompletion.get())
-            {
-                var autoReconnect = Modules.get().get(AutoReconnect.class);
-                if (autoReconnect.isActive()) autoReconnect.toggle();
-                mc.player.connection.handleDisconnect(new ClientboundDisconnectPacket(Component.literal("[Search Area] Path is complete")));
-            }
+            completePath();
         }
         else if (pd.mainPath && (
             (pd.yawDirection == -90.0f && mc.player.getX() >= Math.max(pd.initialPos.getX(), pd.targetPos.getX())) ||

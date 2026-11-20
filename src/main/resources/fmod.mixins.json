@@ -10,6 +10,8 @@
     "UIUtilsSignMixin",
     "UIUtilsResourcePackMixin",
     "ClientPlayerInteractionManagerMixin",
+    "EventlessFlyMixin",
+    "KnockbackTweaksMixin",
     "ShulkerOverviewMixin",
     "AnvilScreenAccessor",
     "SignEditScreenAccessor",
@@ -21,6 +23,7 @@
     "VanillaCoordinateTextMixin",
     "AbstractBlockBlockStateMixin",
     "AbstractBlockMixin",
+    "FramerateLimitTrackerMixin",
     "stashhunting.LivingEntityMixin",
     "stashhunting.XaeroDrawingMixin"
   ],

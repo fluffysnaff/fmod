@@ -8,12 +8,12 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class CourierSafetyTest {
     @Test void allowsOnlyTheFullyVerifiedEmptyReturn() {
-        assertTrue(new ReturnCheck(true, true, true, true, true, true, true, true, true).mayDie());
+        assertTrue(new ReturnCheck(true, true, true, true, true, true, true, true, true).ready());
         for (int missing = 0; missing < 9; missing++) {
             boolean[] facts = {true, true, true, true, true, true, true, true, true};
             facts[missing] = false;
             assertFalse(new ReturnCheck(facts[0], facts[1], facts[2], facts[3], facts[4],
-                facts[5], facts[6], facts[7], facts[8]).mayDie(), "Missing return prerequisite " + missing);
+                facts[5], facts[6], facts[7], facts[8]).ready(), "Missing return prerequisite " + missing);
         }
     }
 

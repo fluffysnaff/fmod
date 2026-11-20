@@ -3,11 +3,11 @@ package addon.fmod.modules;
 import addon.fmod.FMod;
 import meteordevelopment.meteorclient.events.world.TickEvent;
 import meteordevelopment.meteorclient.settings.*;
-import meteordevelopment.meteorclient.systems.modules.Category;
 import meteordevelopment.meteorclient.systems.modules.Module;
+import meteordevelopment.meteorclient.systems.modules.Modules;
 import meteordevelopment.meteorclient.utils.player.InvUtils;
-// import meteordevelopment.meteorclient.utils.player.FindItemResult; // Not directly used but good to keep if InvUtils.findInHotbar is used elsewhere
 import meteordevelopment.orbit.EventHandler;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.decoration.ItemFrame;
 import net.minecraft.world.item.ItemStack;
@@ -74,7 +74,7 @@ public class FrameDupe extends Module {
     );
 
     private ItemStack savedInitialStack;
-    private boolean savedItemWasNonStackable;
+    private LocalPlayer owner;
 
     private final List<ItemFrame> itemFrames = new ArrayList<>();
     private int currentFrameIndex;
@@ -106,20 +106,20 @@ public class FrameDupe extends Module {
             toggle();
             return;
         }
-        savedInitialStack = mc.player.getMainHandItem().copy(); // Make a copy
+        savedInitialStack = mc.player.getMainHandItem().copy();
         if (savedInitialStack.isEmpty()) {
             error("Cannot activate with an empty hand.");
             toggle();
             return;
         }
-        savedItemWasNonStackable = savedInitialStack.getMaxStackSize() == 1;
+        owner = mc.player;
 
         currentState = State.SEARCHING_FRAMES;
         itemFrames.clear();
         currentFrameIndex = -1;
         currentTargetFrame = null;
         timer = 0;
-        info("Activated. Initial item: %s (Non-stackable: %b)", savedInitialStack.getHoverName().getString(), savedItemWasNonStackable);
+        info("Selected %s.", savedInitialStack.getHoverName().getString());
     }
 
     @Override
@@ -128,18 +128,20 @@ public class FrameDupe extends Module {
         itemFrames.clear();
         savedInitialStack = null;
         currentTargetFrame = null;
-        if (InvUtils.previousSlot != -1) {
-            InvUtils.swapBack();
-        }
-        info("Deactivated.");
+        owner = null;
     }
 
     @EventHandler
     private void onTick(TickEvent.Post event) {
-        if (mc.player == null || mc.level == null || mc.gameMode == null || savedInitialStack == null) {
+        if (mc.player == null || mc.level == null || mc.gameMode == null || savedInitialStack == null
+            || mc.player != owner || !owner.isAlive()) {
             if (isActive()) toggle();
             return;
         }
+
+        var courier = Modules.get().get(StasisCourier.class);
+        if (mc.gui.screen() != null || owner.containerMenu != owner.inventoryMenu
+            || !owner.containerMenu.getCarried().isEmpty() || courier != null && courier.isRunning()) return;
 
         if (timer > 0) {
             timer--;
@@ -150,7 +152,7 @@ public class FrameDupe extends Module {
             case SEARCHING_FRAMES:
                 itemFrames.clear();
                 for (Entity entity : mc.level.entitiesForRendering()) {
-                    if (entity instanceof ItemFrame itemFrameEntity && isTargetValid(itemFrameEntity)) {
+                    if (entity instanceof ItemFrame itemFrameEntity && itemFrameEntity.getItem().isEmpty() && isTargetValid(itemFrameEntity)) {
                         itemFrames.add(itemFrameEntity);
                     }
                 }
@@ -164,7 +166,6 @@ public class FrameDupe extends Module {
                 if (currentTargetFrame != null) {
                     currentState = State.CHECK_ITEM_SWITCH;
                 } else {
-                    info("No item frames found in range. Will retry.");
                     timer = delayNextFrame.get() * 2;
                     currentState = State.DELAY_BEFORE_NEXT_OPERATION;
                 }
@@ -176,37 +177,16 @@ public class FrameDupe extends Module {
                     break;
                 }
 
-                if (savedItemWasNonStackable) {
-                    ItemStack currentMainHand = mc.player.getMainHandItem();
-                    // Use areItemsAndComponentsEqual for proper comparison in 1.20.2+
-                    boolean holdingSavedItemInMainHand = ItemStack.isSameItemSameComponents(currentMainHand, savedInitialStack);
-
-                    if (!holdingSavedItemInMainHand) {
-                        int hotbarSlotToSwitch = -1;
-                        for (int i = 0; i < 9; i++) {
-                            ItemStack hotbarStack = mc.player.getInventory().getItem(i);
-                            // Use areItemsAndComponentsEqual here as well
-                            if (ItemStack.isSameItemSameComponents(hotbarStack, savedInitialStack)) {
-                                hotbarSlotToSwitch = i;
-                                break;
-                            }
-                        }
-
-                        if (hotbarSlotToSwitch != -1) {
-                            if (mc.player.getInventory().getSelectedSlot() != hotbarSlotToSwitch) {
-                                InvUtils.swap(hotbarSlotToSwitch, false);
-                                currentState = State.POST_SWITCH_DELAY;
-                                timer = delayAfterSwitch.get();
-                            } else {
-                                currentState = State.PRE_RIGHT_CLICK_DELAY;
-                                timer = delayBeforeRightClick.get();
-                            }
-                        } else {
-                            error("Saved non-stackable item '%s' not found in hotbar. Skipping frame.", savedInitialStack.getHoverName().getString());
-                            advanceToNextFrameOrRescan();
-                        }
-                        break;
+                if (!matchesSelectedItem(mc.player.getMainHandItem())) {
+                    for (int slot = 0; slot < 9; slot++) {
+                        if (!matchesSelectedItem(mc.player.getInventory().getItem(slot))) continue;
+                        InvUtils.swap(slot, false);
+                        currentState = State.POST_SWITCH_DELAY;
+                        timer = delayAfterSwitch.get();
+                        return;
                     }
+                    advanceToNextFrameOrRescan();
+                    break;
                 }
                 currentState = State.PRE_RIGHT_CLICK_DELAY;
                 timer = delayBeforeRightClick.get();
@@ -230,11 +210,14 @@ public class FrameDupe extends Module {
                 break;
 
             case RIGHT_CLICKING:
-                if (currentTargetFrame == null || !isTargetValid(currentTargetFrame)) {
+                if (!isTargetValid(currentTargetFrame) || !currentTargetFrame.getItem().isEmpty()
+                    || !matchesSelectedItem(mc.player.getMainHandItem())) {
                     advanceToNextFrameOrRescan();
                     break;
                 }
-                mc.gameMode.interact(mc.player, currentTargetFrame, new EntityHitResult(currentTargetFrame), InteractionHand.MAIN_HAND);
+                mc.gameMode.interact(mc.player, currentTargetFrame,
+                    new EntityHitResult(currentTargetFrame, currentTargetFrame.getBoundingBox().getCenter()),
+                    InteractionHand.MAIN_HAND);
                 currentState = State.PRE_LEFT_CLICK_DELAY;
                 timer = delayBeforeLeftClick.get();
                 break;
@@ -252,7 +235,7 @@ public class FrameDupe extends Module {
                     advanceToNextFrameOrRescan();
                     break;
                 }
-                mc.gameMode.attack(mc.player, currentTargetFrame);
+                if (matchesSelectedItem(currentTargetFrame.getItem())) mc.gameMode.attack(mc.player, currentTargetFrame);
                 advanceToNextFrameOrRescan();
                 break;
 
@@ -270,8 +253,12 @@ public class FrameDupe extends Module {
         }
     }
 
+    private boolean matchesSelectedItem(ItemStack stack) {
+        return !stack.isEmpty() && ItemStack.isSameItemSameComponents(stack, savedInitialStack);
+    }
+
     private boolean isTargetValid(ItemFrame entity) {
-        if (entity == null || !entity.isAlive()) return false;
+        if (entity == null || entity.level() != mc.level || !entity.isAlive()) return false;
         return mc.player.getEyePosition().distanceTo(entity.position()) <= range.get();
     }
 
@@ -279,7 +266,7 @@ public class FrameDupe extends Module {
         currentTargetFrame = null;
         while (currentFrameIndex < itemFrames.size()) {
             ItemFrame frame = itemFrames.get(currentFrameIndex);
-            if (isTargetValid(frame)) {
+            if (isTargetValid(frame) && frame.getItem().isEmpty()) {
                 currentTargetFrame = frame;
                 return;
             }

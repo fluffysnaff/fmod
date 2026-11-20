@@ -38,9 +38,11 @@ public final class MeteorFlightChunkGuard {
         var movement = event.movement;
         if (movement.x == 0 && movement.z == 0) return;
         var box = mc.player.getBoundingBox();
-        if (LoadedChunkPath.canMove(box.minX, box.minZ, box.maxX, box.maxZ, movement.x, movement.z, mc.level.getChunkSource()::hasChunk)) return;
-        ((IVec3) movement).meteor$setXZ(0, 0);
+        double fraction = LoadedChunkPath.maxFraction(box.minX, box.minZ, box.maxX, box.maxZ, movement.x, movement.z, mc.level.getChunkSource()::hasChunk);
+        if (fraction >= 1.0) return;
+        // Glide to the loaded frontier instead of hard-stopping a chunk early.
+        ((IVec3) movement).meteor$setXZ(movement.x * fraction, movement.z * fraction);
         var velocity = mc.player.getDeltaMovement();
-        mc.player.setDeltaMovement(0, velocity.y, 0);
+        mc.player.setDeltaMovement(velocity.x * fraction, velocity.y, velocity.z * fraction);
     }
 }

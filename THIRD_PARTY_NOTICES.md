@@ -83,3 +83,11 @@ That upstream revision declares CC BY-NC-SA 4.0 with additional distribution
 restrictions in its `LICENSE` and usage restrictions in `TERMS.md`. FMod's GPL
 declaration does not relicense that upstream work or grant permission to copy
 or redistribute it. The native FMod implementation uses GPL-3.0-only.
+
+## Meteor Satellite Addon
+
+EventlessFly, KnockbackTweaks, SeedMap and the frame-state checks in FrameDupe
+are adapted from or based on [crazycat256/meteor-satellite-addon](https://github.com/crazycat256/meteor-satellite-addon/tree/6e0a2c2861ec2de3431291fea4e42c1eda188b01),
+revision `6e0a2c2861ec2de3431291fea4e42c1eda188b01`. Copyright (c) crazycat256.
+The upstream project is licensed under GNU GPL version 3. The license text is
+in `LICENSE` and in the distributable as `LICENSE_fmod`. SeedMap targets Chunkbase.

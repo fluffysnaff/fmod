@@ -1,12 +1,12 @@
 package addon.fmod;
 
 import addon.fmod.commands.commands.*;
-import addon.fmod.hud.BaseScoutHud;
 import addon.fmod.hud.DubCounterHud;
 import addon.fmod.features.containers.ContainerTracker;
 import addon.fmod.features.containers.ContainerWorld;
 import addon.fmod.features.flight.MeteorFlightChunkGuard;
 import addon.fmod.volytra.VolytraIntegration;
+import addon.fmod.utils.WarpUtils;
 import addon.fmod.modules.*;
 import addon.fmod.modules.notexturerotations.NoTextureRotations;
 import addon.fmod.stashhunting.StashHunting;
@@ -34,10 +34,10 @@ public class FMod extends MeteorAddon {
         initModulesFMod();
         MeteorFlightChunkGuard.register();
         VolytraIntegration.register();
-        Hud.get().register(BaseScoutHud.INFO);
         Hud.get().register(DubCounterHud.INFO);
         MeteorClient.EVENT_BUS.subscribe(ContainerWorld.INSTANCE);
         MeteorClient.EVENT_BUS.subscribe(ContainerTracker.INSTANCE);
+        MeteorClient.EVENT_BUS.subscribe(WarpUtils.INSTANCE);
 
         // Commands
         initCommandsFMod();
@@ -59,10 +59,16 @@ public class FMod extends MeteorAddon {
     {
         Modules.get().add(new NoTextureRotations());
         Modules.get().add(new FrameDupe());
+        Modules.get().add(new EventlessFly());
+        Modules.get().add(new KnockbackTweaks());
+        Modules.get().add(new SeedMap());
         Modules.get().add(new UIUtils());
         Modules.get().add(new CoordHider());
-        Modules.get().add(new BaseScout());
         Modules.get().add(new InstaMine());
+        Modules.get().add(new InfReach());
+        Modules.get().add(new SpeedBypass());
+        Modules.get().add(new AntiMapCrash());
+        Modules.get().add(new NoFpsThrottle());
         Modules.get().add(new StasisCourier());
         Modules.get().add(new PearlLoader());
         Modules.get().add(new ChestTrackerModule());
@@ -82,8 +88,8 @@ public class FMod extends MeteorAddon {
         Commands.add(new AutoClipCommand());
         Commands.add(new SHClipCommand());
         Commands.add(new DClipCommand());
-        Commands.add(new ClubMateCommand());
-        Commands.add(new BaseScoutCommand());
+        Commands.add(new VClipCommand());
+        Commands.add(new StashMapCommand());
         Commands.add(new ChestTrackerCommand());
         Commands.add(new PearlLoaderCommand());
         Commands.add(new StashMoverCommand());

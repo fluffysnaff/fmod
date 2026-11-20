@@ -16,6 +16,7 @@ import meteordevelopment.meteorclient.settings.*;
 import meteordevelopment.meteorclient.systems.friends.Friends;
 import addon.fmod.FMod;
 import addon.fmod.modules.CoordHider;
+import addon.fmod.features.flight.LoadedChunkPath;
 import addon.fmod.volytra.FlightEnvelope;
 import addon.fmod.volytra.autonav.WaypointProgress;
 import addon.fmod.volytra.autonav.NavigationProgress;
@@ -426,7 +427,7 @@ public class VolytraFly extends Module {
 
     public final Setting<Boolean> dontGoIntoUnloadedChunks = sgGeneral.add(new BoolSetting.Builder()
         .name("no-unloaded-chunks")
-        .description("Stops you from flying into unloaded chunks")
+        .description("Glides to the loaded-chunk frontier instead of flying your hitbox into unloaded chunks, then waits for them to load.")
         .defaultValue(false)
         .build()
     );
@@ -1683,16 +1684,19 @@ public class VolytraFly extends Module {
             // After every steering step, so no mode can move the player while chunks load
             handleMappingMode();
 
-            int chunkX = (int) Math.floor((player.getX() + velX) / 16.0);
-            int chunkZ = (int) Math.floor((player.getZ() + velZ) / 16.0);
-            if (dontGoIntoUnloadedChunks.get() && !world.getChunkSource().hasChunk(chunkX, chunkZ)) {
+            // Glide to the loaded frontier instead of hard-stopping a chunk early: scale the
+            // horizontal step to the largest fraction whose swept hitbox stays in loaded chunks.
+            var box = player.getBoundingBox();
+            double loadedFraction = dontGoIntoUnloadedChunks.get()
+                ? LoadedChunkPath.maxFraction(box.minX, box.minZ, box.maxX, box.maxZ, velX, velZ, world.getChunkSource()::hasChunk)
+                : 1.0;
+            if (loadedFraction < 1.0) {
                 diagnosticBlockedByChunks = true;
                 // Don't reset acceleration/ramp state here - this fires every tick you're
                 // outrunning chunk loading, and a full zeroAcceleration() would stomp your
-                // ramped/held speed even though you never actually stopped moving. Just
-                // suppress this tick's horizontal movement.
+                // ramped/held speed even though you never actually stopped moving.
                 assistantFlag(AssistantSituation.UNLOADED_CHUNKS);
-                ((IVec3) event.movement).meteor$set(0, velY, 0);
+                ((IVec3) event.movement).meteor$set(velX * loadedFraction, velY, velZ * loadedFraction);
             } else {
                 ((IVec3) event.movement).meteor$set(velX, velY, velZ);
             }
@@ -2985,7 +2989,25 @@ public class VolytraFly extends Module {
         startAutonav(autonavGotoX.get(), autonavGotoZ.get());
     }
 
+    /** Programmatic Autonav entry for other FMod features (e.g. Search Area). Ensures Autonav is on and flies to the block column. */
+    public boolean navigateTo(int blockX, int blockZ) {
+        if (!isActive() || mc.player == null || mc.level == null) return false;
+        if (!autonav.get()) autonav.set(true);
+        startAutonav(blockX, blockZ, false); // never close an open screen (e.g. the Stash Map) on programmatic navigation
+        return true;
+    }
+
+    public boolean isAutonavActive() { return autonavActive; }
+
+    public double autonavArrival() { return autonavArrivalRadius.get(); }
+
+    public void stopAutonav() { if (autonavActive) cancelAutonav(); }
+
     private void startAutonav(int blockX, int blockZ) {
+        startAutonav(blockX, blockZ, autonavCloseMap.get());
+    }
+
+    private void startAutonav(int blockX, int blockZ, boolean closeMap) {
         if (Math.abs((long) blockX) > 29999984 || Math.abs((long) blockZ) > 29999984) {
             warning("Destination is outside the supported world bounds.");
             return;
@@ -3012,7 +3034,7 @@ public class VolytraFly extends Module {
         assistantMarkActive();
         assistantSay("map-set-" + blockX + "," + blockZ, false, true, "Got it! Flying to " + blockX + ", " + blockZ);
 
-        if (autonavCloseMap.get() && mc.gui.screen() != null) mc.gui.setScreen(null);
+        if (closeMap && mc.gui.screen() != null) mc.gui.setScreen(null);
     }
 
     private void cancelAutonav() {
@@ -3617,7 +3639,12 @@ public class VolytraFly extends Module {
         }
 
         if (request.status == AutonavPlanner.Status.SEALED) {
-            if (request.recovery) { pauseAutonav("No passable local escape was found in the received terrain."); return; }
+            if (request.recovery && !unloadedTowardDestination()) {
+                pauseAutonav("No passable local escape was found in the received terrain.");
+                return;
+            }
+            // Either a non-recovery seal, or a recovery seal whose only blockage is unreceived chunks
+            // ahead: hold and keep retrying as they stream in rather than pausing and forcing a reconnect.
             mapRouteNodes.clear();
             mapRouteIndex = 0;
             mapNoRoute = true;
@@ -3631,6 +3658,24 @@ public class VolytraFly extends Module {
         mapRouteIndex = 0;
         mapRouteEndsAtFrontier = request.status == AutonavPlanner.Status.REACHED_FRONTIER;
         mapRelocating = request.status == AutonavPlanner.Status.RELOCATING;
+    }
+
+    /** Whether the straight line toward the destination runs into chunks the client has not received yet. */
+    private boolean unloadedTowardDestination() {
+        Player player = mc.player;
+        if (player == null || mc.level == null) return false;
+        double dx = mapDestX - player.getX();
+        double dz = mapDestZ - player.getZ();
+        double len = Math.hypot(dx, dz);
+        if (len < 1.0) return false;
+        dx /= len;
+        dz /= len;
+        for (int d = 8; d <= 48; d += 8) {
+            int cx = ((int) Math.floor(player.getX() + dx * d)) >> 4;
+            int cz = ((int) Math.floor(player.getZ() + dz * d)) >> 4;
+            if (!mc.level.getChunkSource().hasChunk(cx, cz)) return true;
+        }
+        return false;
     }
 
     /** Moves mapRouteIndex forward past every segment of the route the player has already flown. */

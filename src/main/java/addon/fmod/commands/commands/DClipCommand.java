@@ -23,7 +23,7 @@ public class DClipCommand extends Command {
             Vec3 pos = mc.player.position();
             // Move into players viewing direction
             Vec3 targetPos = pos.add(mc.player.getLookAngle().normalize().scale(distance));
-            WarpUtils.warpTo(targetPos, 18);
+            WarpUtils.warp(targetPos);
 
             return SINGLE_SUCCESS;
         }));

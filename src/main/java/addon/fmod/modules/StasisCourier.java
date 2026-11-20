@@ -33,16 +33,20 @@ import net.minecraft.world.entity.projectile.throwableitemprojectile.ThrownEnder
 import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BedBlock;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.ButtonBlock;
 import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.entity.BarrelBlockEntity;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BedPart;
 import net.minecraft.world.level.block.state.properties.ChestType;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
@@ -54,16 +58,21 @@ import java.util.concurrent.TimeUnit;
 
 public final class StasisCourier extends Module {
     public enum Recall { Stasis, Tpa }
+    public enum ReturnMode { KillCommand, ReturnPearl, TrapButton }
     public enum CargoStorage { Carried, EnderChest }
+    private static final String TRAP_NOT_READY = "The marked trap button must be unchanged, unpowered, visible and within reach. Release sneak.";
     private enum Phase {
         Load, StoreInEnder, PrepareRecall, AwaitRecall, CollectFromEnder, Unload,
-        TakePearls, ThrowPearl, AwaitPearl, StoreRemainder, ReturnEmpty, AwaitDeath, AwaitRespawn
+        TakePearls, ThrowPearl, AwaitPearl, StoreRemainder, ReturnEmpty, AwaitDeath, AwaitRespawn, AwaitSourceRecall
     }
 
     private final SettingGroup general = settings.getDefaultGroup();
     private final Setting<Recall> recall = general.add(new EnumSetting.Builder<Recall>()
         .name("recall").description("B manually triggers stasis, or manually accepts one tpa request. Changing this invalidates the empty trials.")
         .defaultValue(Recall.Stasis).onChanged(value -> invalidate()).build());
+    private final Setting<ReturnMode> returnMode = general.add(new EnumSetting.Builder<ReturnMode>()
+        .name("return-mode").description("Return to the bed using /kill or a marked trap button, or use a second stasis chamber.")
+        .defaultValue(ReturnMode.KillCommand).onChanged(value -> invalidate()).build());
     private final Setting<CargoStorage> cargoStorage = general.add(new EnumSetting.Builder<CargoStorage>()
         .name("cargo-storage").description("Carry sealed shulkers normally, or protect the shipment in A's own Ender Chest.")
         .defaultValue(CargoStorage.EnderChest).onChanged(value -> invalidate()).build());
@@ -90,14 +99,17 @@ public final class StasisCourier extends Module {
 
     private BlockPos sourceBed;
     private StationBlock sourceStorage, sourceEnder, destinationStorage, destinationEnder, chamber;
-    private ThrowPose destination;
+    private ThrowPose source, destination;
+    private TrapButtonMark trapButton;
+    private StationBlock sourceChamber;
+    private UUID armedSourcePearl;
     private StationBlock sourceCorner1, sourceCorner2, destinationCorner1, destinationCorner2;
     private int verifiedTrials;
     private Run run;
     private String status = "Enable the module, then mark both stations. Locations are session-only.";
 
     public StasisCourier() {
-        super(FMod.CATEGORY, "stash-mover", "Automates A's shulker shipments and empty /kill bed returns. B recalls manually; test the route before cargo.", "stasis-courier", "stashmover");
+        super(FMod.CATEGORY, "stash-mover", "Moves shulker shipments with manual recalls and empty returns by bed or a second stasis chamber.", "stasis-courier", "stashmover");
     }
     public boolean isRunning() { return run != null; }
     public void beginTrials(){startTrials();printStatus();}
@@ -114,13 +126,20 @@ public final class StasisCourier extends Module {
         stop("Session cleared. Mark the bed, storage and destination again.");
         sourceBed = null;
         sourceStorage = sourceEnder = destinationStorage = destinationEnder = chamber = null;
-        destination = null;
+        source = destination = null;
+        trapButton = null;
+        sourceChamber = null;
+        armedSourcePearl = null;
         sourceCorner1=sourceCorner2=destinationCorner1=destinationCorner2=null;
         verifiedTrials = 0;
     }
 
     private void stop(String reason) { run = null; status = reason; }
-    private void invalidate() { verifiedTrials = 0; stop("Route changed. Repeat the two empty trials."); }
+    private void invalidate() {
+        verifiedTrials = 0;
+        armedSourcePearl = null;
+        stop("Route changed. Repeat the two empty trials.");
+    }
 
     private boolean available() {
         if (!isActive() || mc.player == null || mc.level == null || mc.gameMode == null || !mc.player.isAlive()) {
@@ -169,11 +188,36 @@ public final class StasisCourier extends Module {
         status = "Destination landing and pearl-throw pose marked. Arrange the chamber to return A to this spot.";
     }
 
-    private void markChamber() {
+    private void markSourcePose() {
+        if (!available() || !mc.level.dimension().equals(Level.OVERWORLD)) return;
+        invalidate();
+        source = new ThrowPose(mc.level.dimension(), mc.player.position(), mc.player.getYRot(), mc.player.getXRot());
+        status = "Source landing and pearl-throw pose marked.";
+    }
+
+    private void markTrapButton() {
+        if (!available()) return;
+        if (!(mc.hitResult instanceof BlockHitResult hit) || hit.getType() != HitResult.Type.BLOCK) {
+            status = "Look at the button that triggers the destination death trap.";
+            return;
+        }
+        BlockState state = mc.level.getBlockState(hit.getBlockPos());
+        if (!(state.getBlock() instanceof ButtonBlock)) {
+            status = "Look at the button that triggers the destination death trap.";
+            return;
+        }
+        invalidate();
+        trapButton = new TrapButtonMark(mc.level.dimension(), hit, state.setValue(ButtonBlock.POWERED, false));
+        status = "Destination trap button marked. Test the trap with an empty courier.";
+    }
+
+    private void markChamber(boolean atSource) {
         if (!available() || !(mc.hitResult instanceof BlockHitResult hit)) return;
         invalidate();
-        chamber = new StationBlock(mc.level.dimension(), hit.getBlockPos().immutable());
-        status = "Pearl region marked around this block. B must still verify the chamber and operate recalls.";
+        StationBlock mark = new StationBlock(mc.level.dimension(), hit.getBlockPos().immutable());
+        if (atSource) sourceChamber = mark;
+        else chamber = mark;
+        status = atSource ? "Source return pearl region marked." : "Destination recall pearl region marked.";
     }
 
     public void markArea(boolean source, int corner) {
@@ -216,23 +260,42 @@ public final class StasisCourier extends Module {
         return best;
     }
 
+    private boolean usesReturnPearl() { return returnMode.get() == ReturnMode.ReturnPearl; }
+
     private boolean setupValid() {
         if (!available()) return false;
-        if (sourceBed == null || sourceStorage == null || destinationStorage == null || destination == null
+        if ((usesReturnPearl() ? source == null || sourceChamber == null : sourceBed == null)
+            || sourceStorage == null || destinationStorage == null || destination == null
             || cargoStorage.get() == CargoStorage.EnderChest && (sourceEnder == null || destinationEnder == null)
             || recall.get() == Recall.Stasis && chamber == null) {
-            status = "Mark the source bed, station containers, destination pose and (for stasis) pearl region first.";
+            status = "Mark the station containers, destination pose and the bed or return pearl setup for the selected route.";
             return false;
         }
+        if (usesReturnPearl() && (!source.dimension.equals(sourceChamber.dimension)
+            || recall.get() == Recall.Stasis && !source.dimension.equals(destination.dimension))) {
+            status = "Mark the source chamber in the Overworld. For two-way vanilla stasis, use the same dimension at both stations.";
+            return false;
+        }
+        if (returnMode.get() == ReturnMode.KillCommand && !hasKillCommand()) {
+            status = "This server did not advertise /kill. Select TrapButton or ReturnPearl.";
+            return false;
+        }
+        if (returnMode.get() == ReturnMode.TrapButton
+            && (trapButton == null || !trapButton.dimension.equals(destination.dimension))) {
+            status = "Mark the death trap button in the destination dimension.";
+            return false;
+        }
+        Vec3 sourcePosition = usesReturnPearl() ? source.position : Vec3.atCenterOf(sourceBed);
         if (!destinationStorage.dimension.equals(destination.dimension)
             || destinationEnder != null && !destinationEnder.dimension.equals(destination.dimension)
             || chamber != null && !chamber.dimension.equals(destination.dimension)
-            || position(Level.OVERWORLD, Vec3.atCenterOf(sourceBed)).within(position(destination.dimension, destination.position), 32)) {
+            || position(Level.OVERWORLD, sourcePosition).within(position(destination.dimension, destination.position), 32)) {
             status = "Source and destination must be distinct; destination marks must share a dimension.";
             return false;
         }
-        if (sourceStorage.pos.distSqr(sourceBed) > 64 || sourceEnder != null && sourceEnder.pos.distSqr(sourceBed) > 64) {
-            status = "Place the source containers within 8 blocks of the bed and within actual reach of its respawn space.";
+        if (Vec3.atCenterOf(sourceStorage.pos).distanceToSqr(sourcePosition) > 64
+            || sourceEnder != null && Vec3.atCenterOf(sourceEnder.pos).distanceToSqr(sourcePosition) > 64) {
+            status = "Place the source containers within 8 blocks of the source pose or bed and within actual reach.";
             return false;
         }
         if (recall.get() == Recall.Tpa && !operator.get().matches("[A-Za-z0-9_]{1,16}")) {
@@ -248,23 +311,29 @@ public final class StasisCourier extends Module {
 
     private void startTrials() {
         if (!setupValid()) return;
-        if (!atDestination() || !emptyForDeath()) {
-            status = "Start the trials empty at the captured destination pose: clear inventory, equipment, crafting and cursor.";
+        if (!(usesReturnPearl() ? atSource() : atDestination()) || !emptyForDeath()) {
+            status = usesReturnPearl() ? "Start empty at the source pose with B's destination recall already prepared."
+                : "Start the trials empty at the captured destination pose.";
+            return;
+        }
+        if (returnMode.get() == ReturnMode.TrapButton && readyTrapHit() == null) {
+            status = TRAP_NOT_READY;
             return;
         }
         verifiedTrials = 0;
         run = new Run(true, mc.player.getUUID(), 0);
-        beginReturn();
+        if (usesReturnPearl()) armPearl(true);
+        else beginReturn();
     }
 
     private void startShipments() {
         if (!setupValid()) return;
-        if (verifiedTrials < 2 || !atSource() || !bedIntact() || !emptyForDeath()) {
-            status = "Complete the two empty trials, then start empty beside the intact source bed.";
+        if (verifiedTrials < 2 || !sourceReady() || !emptyForDeath()) {
+            status = "Complete two empty round trips, then start empty at the configured source.";
             return;
         }
         run = new Run(false, mc.player.getUUID(), shipments.get());
-        advance(Phase.Load, "Loading sealed shulkers from source storage.");
+        startFromSource();
     }
 
     private void advance(Phase phase, String message) {
@@ -298,7 +367,7 @@ public final class StasisCourier extends Module {
 
     @EventHandler private void onTick(TickEvent.Post event) {
         if (run == null) return;
-        long timeout = TimeUnit.SECONDS.toNanos(run.phase == Phase.AwaitRecall ? recallTimeout.get() : 45);
+        long timeout = TimeUnit.SECONDS.toNanos((run.phase == Phase.AwaitRecall || run.phase == Phase.AwaitSourceRecall) ? recallTimeout.get() : 45);
         if (System.nanoTime() - run.enteredNanos > timeout) {
             stop("Step timed out. Recall, transfer, death or bed return was not confirmed; inspect the route before restarting.");
             return;
@@ -324,6 +393,7 @@ public final class StasisCourier extends Module {
             case ReturnEmpty -> returnEmpty();
             case AwaitDeath -> awaitDeath();
             case AwaitRespawn -> awaitRespawn();
+            case AwaitSourceRecall -> awaitSourceRecall();
         }
     }
 
@@ -342,7 +412,7 @@ public final class StasisCourier extends Module {
     }
 
     private void load() {
-        if (!atSource() || !bedIntact() || !equipmentEmpty() || !craftingEmpty()) { stop("Source bed or empty equipment/crafting check failed."); return; }
+        if (!sourceReady() || !equipmentEmpty() || !craftingEmpty()) { stop("Source station or empty equipment/crafting check failed."); return; }
         if(run.sourceChoice==null)run.sourceChoice=nextContainer(true,run.emptySources);
         if(run.sourceChoice==null){finishLoading();return;}
         CourierTransfer operation = transfer(run.sourceChoice, false, CourierTransfer.Mode.LoadCargo, List.of(), null);
@@ -379,7 +449,8 @@ public final class StasisCourier extends Module {
     }
 
     private void prepareRecall() {
-        if (!atSource() || !bedIntact() || !equipmentEmpty() || !craftingEmpty() || !cursorEmpty()) {
+        if (!sourceReady() || !equipmentEmpty() || !craftingEmpty() || !cursorEmpty()
+            || usesReturnPearl() && (!healthyForPearl() || !pearlPresent(run.sourcePearl, sourceChamber))) {
             stop("Source readiness check failed. B must not trigger yet."); return;
         }
         List<ItemStack> expected = cargoStorage.get() == CargoStorage.Carried && !run.testing ? run.cargo : List.of();
@@ -390,11 +461,15 @@ public final class StasisCourier extends Module {
     }
 
     private void awaitRecall() {
-        if (!atDestination()) return;
+        if (!atDestination()) {
+            if (usesReturnPearl() && (!atSource() || !pearlPresent(run.sourcePearl, sourceChamber)))
+                stop("Source return pearl disappeared or A left the source before recall.");
+            return;
+        }
         if (!equipmentEmpty() || !craftingEmpty() || !cursorEmpty()) { stop("Unexpected equipment or cursor after recall."); return; }
         if (run.testing) {
             if (!mainInventory().isEmpty()) { stop("Empty trial arrived carrying items. Store them and repeat the trials."); return; }
-            verifiedTrials++;
+            run.trialRecallObserved = true;
             beginReturn();
         } else if (cargoStorage.get() == CargoStorage.EnderChest) {
             if (!mainInventory().isEmpty()) { stop("Unexpected carried items after recall."); return; }
@@ -440,46 +515,85 @@ public final class StasisCourier extends Module {
         beginReturn();
     }
 
-    private void beginReturn() {
-        run.pearl = null;
-        run.priorPearls.clear();
-        advance(recall.get() == Recall.Stasis ? Phase.TakePearls : Phase.StoreRemainder,
-            "Shipment stored. Preparing the next recall before the empty bed return.");
+    private void startFromSource() {
+        if (usesReturnPearl()) armPearl(true);
+        else advance(run.testing ? Phase.PrepareRecall : Phase.Load, "Ready at the source.");
     }
 
+    private void beginReturn() {
+        if (recall.get() == Recall.Stasis) {
+            armPearl(false);
+        } else {
+            run.armingSource = false;
+            advance(Phase.StoreRemainder, "Checking server inventory before the empty return.");
+        }
+    }
+
+    private void armPearl(boolean atSource) {
+        if (!emptyForDeath()) { stop("Clear carried items and equipment before arming a pearl."); return; }
+        if (usesReturnPearl() && !healthyForPearl()) {
+            stop("Restore health before arming or using a stasis pearl.");
+            return;
+        }
+        if (atSource && pearlPresent(armedSourcePearl, sourceChamber)) {
+            sourcePearlReady(armedSourcePearl);
+            return;
+        }
+        run.armingSource = atSource;
+        run.pearl = null;
+        run.priorPearls.clear();
+        advance(Phase.TakePearls, "Taking pearls from " + (atSource ? "source" : "destination") + " storage.");
+    }
+
+    private boolean atArmingStation() { return run.armingSource ? atSource() : atDestination(); }
+    private StationBlock armingStorage() { return run.armingSource ? sourceStorage : destinationStorage; }
+    private StationBlock armingChamber() { return run.armingSource ? sourceChamber : chamber; }
+    private boolean healthyForPearl() { return mc.player.getHealth() > 5; }
+
     private void takePearls() {
-        if (!atDestination() || !equipmentEmpty() || !craftingEmpty()) { stop("Destination or equipment check failed before rearming."); return; }
-        CourierTransfer operation = transfer(destinationStorage, false, CourierTransfer.Mode.TakePearls, List.of(), null);
+        if (!atArmingStation() || !equipmentEmpty() || !craftingEmpty()) {
+            stop("Station or equipment check failed before arming the pearl.");
+            return;
+        }
+        CourierTransfer operation = transfer(armingStorage(), false, CourierTransfer.Mode.TakePearls, List.of(), null);
         if (operation == null) return;
         List<ItemStack> carried = CourierCargo.nonEmpty(operation.playerAfter());
         if (carried.isEmpty() || carried.stream().anyMatch(stack -> !stack.is(Items.ENDER_PEARL))) {
-            stop("Destination storage needs pearls, and the courier must carry nothing else before rearming."); return;
+            stop("Station storage needs pearls and A must be carrying only pearls.");
+            return;
         }
-        advance(Phase.ThrowPearl, "Throwing A's fresh pearl from the captured pose.");
+        advance(Phase.ThrowPearl, "Throwing a fresh pearl from the captured pose.");
     }
 
     private void throwPearl() {
-        if (!atDestination() || mc.player.position().distanceToSqr(destination.position) > 2.25) {
-            stop("A must land within 1.5 blocks of the captured pearl-throw position. Adjust the station and retest."); return;
+        ThrowPose pose = run.armingSource ? source : destination;
+        if (!atArmingStation() || mc.player.position().distanceToSqr(pose.position) > 2.25) {
+            stop("A must land within 1.5 blocks of the captured pearl-throw position.");
+            return;
         }
         int slot = -1;
         for (int i = 0; i < 9; i++) if (mc.player.getInventory().getItem(i).is(Items.ENDER_PEARL)) { slot = i; break; }
-        if (slot < 0 || !equipmentEmpty() || !craftingEmpty() || !cursorEmpty()) { stop("A pearl must be in the hotbar; clear equipment, crafting and cursor."); return; }
-        for (var entity : mc.level.entitiesForRendering()) {
-            if (entity instanceof ThrownEnderpearl pearl && pearl.getOwner() != null
-                && pearl.getOwner().getUUID().equals(mc.player.getUUID())) {
-                if (run.priorPearls.size() >= 256) { stop("Too many owned pearls loaded to identify a new throw reliably."); return; }
-                run.priorPearls.add(pearl.getUUID());
-            }
+        if (slot < 0 || !equipmentEmpty() || !craftingEmpty() || !cursorEmpty()
+            || mc.player.containerMenu != mc.player.inventoryMenu) {
+            stop("A pearl must be in the hotbar. Clear equipment, crafting and cursor, and close the container.");
+            return;
         }
         if (mc.player.getCooldowns().isOnCooldown(mc.player.getInventory().getItem(slot))) return;
-        advance(Phase.AwaitPearl, "Waiting for A's new pearl to be observed in the marked chamber region.");
+        for (var entity : mc.level.entitiesForRendering()) {
+            if (!(entity instanceof ThrownEnderpearl pearl) || !ownedPearl(pearl)) continue;
+            if (validPearl(pearl, armingChamber())) {
+                stop("An owned pearl is already in this chamber. Clear it before restarting.");
+                return;
+            }
+            if (run.priorPearls.size() >= 256) { stop("Too many owned pearls loaded to identify a new throw."); return; }
+            run.priorPearls.add(pearl.getUUID());
+        }
+        advance(Phase.AwaitPearl, "Waiting for A's new pearl in the marked chamber region.");
         int previousSlot = mc.player.getInventory().getSelectedSlot();
         float previousYaw = mc.player.getYRot(), previousPitch = mc.player.getXRot();
         mc.player.getInventory().setSelectedSlot(slot);
-        // This version's use-item packet carries yaw/pitch; no queued rotation or later callback is needed.
-        mc.player.setYRot(destination.yaw);
-        mc.player.setXRot(destination.pitch);
+        mc.player.setYRot(pose.yaw);
+        mc.player.setXRot(pose.pitch);
         try { mc.gameMode.useItem(mc.player, InteractionHand.MAIN_HAND); }
         finally {
             mc.player.getInventory().setSelectedSlot(previousSlot);
@@ -489,55 +603,115 @@ public final class StasisCourier extends Module {
     }
 
     private void awaitPearl() {
-        if (!atDestination()) { stop("Left the destination while checking the new pearl."); return; }
+        if (!atArmingStation()) { stop("Left the station while checking the new pearl."); return; }
+        ThrownEnderpearl observed = null;
         for (var entity : mc.level.entitiesForRendering()) {
-            if (entity instanceof ThrownEnderpearl pearl && !run.priorPearls.contains(pearl.getUUID()) && validPearl(pearl)
-                && pearl.tickCount >= 20) {
-                run.pearl = pearl.getUUID();
-                advance(Phase.StoreRemainder, "New owned pearl observed in the region. Storing remaining pearls before /kill.");
-                return;
-            }
+            if (!(entity instanceof ThrownEnderpearl pearl) || run.priorPearls.contains(pearl.getUUID())
+                || !validPearl(pearl, armingChamber())) continue;
+            if (observed != null) { stop("More than one new pearl observed in this chamber."); return; }
+            observed = pearl;
+        }
+        if (observed == null) {
+            run.pearl = null;
+        } else if (!observed.getUUID().equals(run.pearl)) {
+            run.pearl = observed.getUUID();
+            run.pearlSeenAt = observed.tickCount;
+        } else if (observed.tickCount - run.pearlSeenAt >= 20) {
+            advance(Phase.StoreRemainder, "Chamber pearl confirmed. Storing remaining pearls.");
         }
     }
 
-    private boolean validPearl(ThrownEnderpearl pearl) {
-        return chamber != null && mc.level.dimension().equals(chamber.dimension) && pearl.isAlive()
-            && pearl.getOwner() != null && pearl.getOwner().getUUID().equals(mc.player.getUUID())
+    private boolean ownedPearl(ThrownEnderpearl pearl) {
+        return pearl.isAlive() && pearl.getOwner() != null && pearl.getOwner().getUUID().equals(mc.player.getUUID());
+    }
+
+    private boolean validPearl(ThrownEnderpearl pearl, StationBlock chamber) {
+        return chamber != null && mc.level.dimension().equals(chamber.dimension) && ownedPearl(pearl)
             && pearl.position().distanceToSqr(Vec3.atCenterOf(chamber.pos)) <= chamberRadius.get() * chamberRadius.get();
     }
 
-    private boolean pearlPresent() {
-        if (recall.get() == Recall.Tpa) return true;
-        if (run.pearl == null) return false;
+    private boolean pearlPresent(UUID id, StationBlock chamber) {
+        if (id == null) return false;
         for (var entity : mc.level.entitiesForRendering()) {
-            if (entity instanceof ThrownEnderpearl pearl && run.pearl.equals(pearl.getUUID())) return validPearl(pearl);
+            if (entity instanceof ThrownEnderpearl pearl && id.equals(pearl.getUUID())) return validPearl(pearl, chamber);
         }
         return false;
     }
 
     private void storeRemainder() {
-        if (!atDestination() || !pearlPresent()) { stop("The rearmed pearl is no longer observed. No death command sent."); return; }
-        CourierTransfer operation = transfer(destinationStorage, false, CourierTransfer.Mode.DepositAll, List.of(), null);
+        boolean armed = run.armingSource || recall.get() == Recall.Stasis;
+        if (!atArmingStation() || armed && !pearlPresent(run.pearl, armingChamber())) {
+            stop("Station or chamber verification failed before the empty return.");
+            return;
+        }
+        CourierTransfer.Mode mode = armed ? CourierTransfer.Mode.DepositAll : CourierTransfer.Mode.Inspect;
+        CourierTransfer operation = transfer(armingStorage(), false, mode, List.of(), null);
         if (operation == null) return;
         if (!CourierCargo.nonEmpty(operation.playerAfter()).isEmpty()) { stop("Remaining carried items were not stored."); return; }
-        advance(Phase.ReturnEmpty, "Server confirmed carried inventory empty. Checking the final /kill gate.");
+        if (run.armingSource) {
+            sourcePearlReady(run.pearl);
+        } else {
+            advance(Phase.ReturnEmpty, "Server confirmed carried inventory empty. Checking the return.");
+        }
     }
 
-    private ReturnCheck returnCheck() {
-        return new ReturnCheck(mc.player != null && mc.player.isAlive(), atDestination(), run.cargo.isEmpty(),
-            pearlPresent(), mainInventory().isEmpty(), equipmentEmpty(), craftingEmpty(), cursorEmpty(),
-            mc.player.containerMenu == mc.player.inventoryMenu);
+    private void sourcePearlReady(UUID pearl) {
+        armedSourcePearl = run.sourcePearl = pearl;
+        advance(run.testing ? Phase.PrepareRecall : Phase.Load, "Source return pearl armed.");
     }
 
     private void returnEmpty() {
-        if (!returnCheck().mayDie()) { stop("Empty-return check failed. Store all items and verify the chamber; no /kill sent."); return; }
+        var check = new ReturnCheck(mc.player.isAlive(), atDestination(), run.cargo.isEmpty(),
+            recall.get() == Recall.Tpa || pearlPresent(run.pearl, chamber), mainInventory().isEmpty(),
+            equipmentEmpty(), craftingEmpty(), cursorEmpty(), mc.player.containerMenu == mc.player.inventoryMenu);
+        if (!check.ready()) { stop("Empty-return check failed. Check the destination chamber and inventory."); return; }
+        if (usesReturnPearl()) {
+            if (run.sourcePearl == null || !healthyForPearl()) {
+                stop("A needs a prepared source chamber and more than five health to return by pearl.");
+                return;
+            }
+            advance(Phase.AwaitSourceRecall, "EMPTY: trigger A's pearl at the source chamber now.");
+            return;
+        }
+        boolean useTrap = returnMode.get() == ReturnMode.TrapButton;
+        BlockHitResult trapHit = useTrap ? readyTrapHit() : null;
+        if (useTrap && trapHit == null) {
+            stop(TRAP_NOT_READY);
+            return;
+        }
+        if (!useTrap && !hasKillCommand()) {
+            stop("This server did not advertise /kill. Configure TrapButton or ReturnPearl and repeat the empty trials.");
+            return;
+        }
         run.deadPlayer = mc.player;
         run.deathObserved = false;
         run.respawnRequested = run.respawnObserved = false;
-        advance(Phase.AwaitDeath, "Sent /kill once while empty. Waiting for observed death.");
-        // Recheck at the command boundary after all transfer observations.
-        if (!returnCheck().mayDie()) { stop("Return conditions changed; no /kill sent."); return; }
-        mc.player.connection.sendCommand("kill");
+        advance(Phase.AwaitDeath, useTrap ? "Pressed the trap button once while empty. Waiting for observed death."
+            : "Sent /kill once while empty. Waiting for observed death.");
+        if (useTrap) {
+            if (!mc.gameMode.useItemOn(mc.player, InteractionHand.MAIN_HAND, trapHit).consumesAction()) {
+                stop("The trap button interaction was not accepted locally.");
+            }
+        } else {
+            mc.player.connection.sendCommand("kill");
+        }
+    }
+
+    private boolean hasKillCommand() {
+        return mc.player.connection.getCommands().getRoot().getChild("kill") != null;
+    }
+
+    private BlockHitResult readyTrapHit() {
+        if (trapButton == null || !trapButton.dimension.equals(mc.level.dimension()) || mc.player.isShiftKeyDown()) return null;
+        BlockPos pos = trapButton.hit.getBlockPos();
+        if (!mc.level.hasChunkAt(pos) || !mc.player.isWithinBlockInteractionRange(pos, 0)) return null;
+        if (mc.level.getBlockState(pos) != trapButton.readyState) return null;
+        Vec3 eye = mc.player.getEyePosition();
+        Vec3 target = trapButton.hit.getLocation();
+        // The saved hit is on the outline, so extend the ray just past that surface.
+        Vec3 end = target.add(target.subtract(eye).normalize().scale(0.02));
+        var hit = mc.level.clip(new ClipContext(eye, end, ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, mc.player));
+        return hit.getType() == HitResult.Type.BLOCK && hit.getBlockPos().equals(pos) ? hit : null;
     }
 
     private void awaitDeath() {
@@ -552,22 +726,45 @@ public final class StasisCourier extends Module {
             if (!run.respawnRequested) { run.respawnRequested = true; mc.player.respawn(); }
             return;
         }
-        if (!run.respawnObserved || !atSource()) return;
-        if (!bedIntact() || !emptyForDeath()) { stop("Respawn did not yield an empty courier beside the intact source bed."); return; }
+        if (run.respawnObserved && atSource()) finishReturn();
+    }
+
+    private void awaitSourceRecall() {
+        if (!atSource()) {
+            if (!atDestination() || !emptyForDeath() || !healthyForPearl()) {
+                stop("A left the destination, picked up items or lost health before the source recall.");
+            }
+            return;
+        }
+        armedSourcePearl = null;
+        finishReturn();
+    }
+
+    private void finishReturn() {
+        if (!sourceReady() || !emptyForDeath() || mc.player.containerMenu != mc.player.inventoryMenu) {
+            stop("The return did not yield an empty courier at the configured source.");
+            return;
+        }
+        if (run.testing && run.trialRecallObserved) {
+            verifiedTrials++;
+            run.trialRecallObserved = false;
+        }
         if (run.testing && verifiedTrials >= 2) {
-            stop("Two empty recalls passed and A returned to source. B must wait; cargo runs may now be started.");
+            stop("Two empty round trips passed. A returned to source and cargo runs may now be started.");
         } else if (!run.testing && run.delivered >= run.deliveryLimit) {
-            stop("Delivery limit reached. A returned empty to the source; B must wait.");
+            stop("Delivery limit reached. A returned empty to the source.");
         } else {
-            advance(run.testing ? Phase.PrepareRecall : Phase.Load,
-                run.testing ? "Empty respawn confirmed. Preparing the next empty recall trial." : "Empty bed respawn confirmed. Loading the next shipment.");
+            startFromSource();
         }
     }
 
     private boolean atSource() {
-        return mc.player != null && mc.level != null && sourceBed != null && mc.level.dimension().equals(Level.OVERWORLD)
-            && mc.player.position().distanceToSqr(Vec3.atCenterOf(sourceBed)) <= 64;
+        if (mc.player == null || mc.level == null || !mc.level.dimension().equals(Level.OVERWORLD)) return false;
+        if (usesReturnPearl()) return source != null && mc.player.position().distanceToSqr(source.position) <= 16;
+        return sourceBed != null && mc.player.position().distanceToSqr(Vec3.atCenterOf(sourceBed)) <= 64;
     }
+
+    private boolean sourceReady() { return usesReturnPearl() ? atSource() : bedIntact(); }
 
     private boolean atDestination() {
         return mc.player != null && mc.level != null && destination != null && mc.level.dimension().equals(destination.dimension)
@@ -616,6 +813,7 @@ public final class StasisCourier extends Module {
     @Override public String getInfoString() {
         if (run == null) return "stopped";
         if (run.phase == Phase.AwaitRecall) return run.testing ? "B: recall EMPTY trial" : "B: recall CARGO";
+        if (run.phase == Phase.AwaitSourceRecall) return "Source: recall EMPTY courier";
         return run.phase.toString();
     }
     @Override public WWidget getWidget(GuiTheme theme) { return new CourierWidget(theme); }
@@ -630,6 +828,8 @@ public final class StasisCourier extends Module {
             statusLabel = add(theme.label(status, 440)).widget();
             var source = add(theme.section("Source setup (look at each block)", false)).widget();
             source.add(theme.button("Mark source Overworld bed")).widget().action = StasisCourier.this::markBed;
+            source.add(theme.button("Capture source landing position and pearl-throw aim")).widget().action = StasisCourier.this::markSourcePose;
+            source.add(theme.button("Mark source return pearl region")).widget().action = () -> markChamber(true);
             source.add(theme.button("Mark source chest / barrel")).widget().action = () -> markContainer(true, false);
             source.add(theme.button("Mark source Ender Chest")).widget().action = () -> markContainer(true, true);
             source.add(theme.button("Mark source cargo area corner 1")).widget().action=()->markArea(true,1);
@@ -638,10 +838,11 @@ public final class StasisCourier extends Module {
             dest.add(theme.button("Capture landing position and pearl-throw aim")).widget().action = StasisCourier.this::markDestination;
             dest.add(theme.button("Mark destination chest / barrel")).widget().action = () -> markContainer(false, false);
             dest.add(theme.button("Mark destination Ender Chest")).widget().action = () -> markContainer(false, true);
-            dest.add(theme.button("Mark block at the waiting pearl's region")).widget().action = StasisCourier.this::markChamber;
+            dest.add(theme.button("Mark block at the waiting pearl's region")).widget().action = () -> markChamber(false);
+            dest.add(theme.button("Mark destination death trap button")).widget().action = StasisCourier.this::markTrapButton;
             dest.add(theme.button("Mark destination cargo area corner 1")).widget().action=()->markArea(false,1);
             dest.add(theme.button("Mark destination cargo area corner 2")).widget().action=()->markArea(false,2);
-            add(theme.button("Start two EMPTY trials from destination")).widget().action = StasisCourier.this::startTrials;
+            add(theme.button("Start two EMPTY round trips")).widget().action = StasisCourier.this::startTrials;
             add(theme.button("Start cargo run from source")).widget().action = StasisCourier.this::startShipments;
             add(theme.button("STOP automation (keep session setup)")).widget().action = () -> stop("Stopped. Review both inventories and the chamber before restarting; no rollback is performed.");
             add(theme.button("Clear all session setup and test results")).widget().action = StasisCourier.this::clearAll;
@@ -649,16 +850,19 @@ public final class StasisCourier extends Module {
             notes.add(theme.label("Set the bed spawn yourself. Keep its respawn spaces clear. Only A runs this module; B manually recalls A when the status says ready.", 440));
             notes.add(theme.label("Use reachable chests/barrels and matching Ender Chests. Cargo is sealed shulker boxes; keep equipment, offhand and crafting empty. Put spare pearls in destination storage.", 440));
             notes.add(theme.label("Capture the destination pose while aiming a pearl into the chamber. It must return A to that throw spot. Mark the region where the pearl waits.", 440));
-            notes.add(theme.label("Trials use /kill and respawn automatically. Default vanilla pearls vanish on death; a visible pearl is not proof of a usable recall. No server compatibility is assumed.", 440));
+            notes.add(theme.label("Bed-return trials start at the destination. TrapButton presses the marked button once and waits for death. ReturnPearl trials start at the source with the destination recall ready.", 440));
         }
 
         private void update(WLabel label, String text) { if (!label.get().equals(text)) label.set(text); }
 
         @Override public boolean render(GuiRenderer renderer, double mouseX, double mouseY, double delta) {
-            update(setupLabel, "Source: bed " + marked(sourceBed) + ", storage " + marked(sourceStorage)
+            update(setupLabel, "Source: " + (usesReturnPearl()
+                ? "landing/aim " + marked(source) + ", pearl region " + marked(sourceChamber) : "bed " + marked(sourceBed))
+                + ", storage " + marked(sourceStorage)
                 + (cargoStorage.get() == CargoStorage.EnderChest ? ", Ender Chest " + marked(sourceEnder) : "")
                 + ". Destination: landing/aim " + marked(destination) + ", storage " + marked(destinationStorage)
                 + (cargoStorage.get() == CargoStorage.EnderChest ? ", Ender Chest " + marked(destinationEnder) : "")
+                + (returnMode.get() == ReturnMode.TrapButton ? ", trap button " + marked(trapButton) : "")
                 + (recall.get() == Recall.Stasis ? ", pearl region " + marked(chamber) : "") + ".");
             update(progressLabel, "Empty recall trials: " + verifiedTrials + "/2; " + (run == null ? "stopped" : "step " + run.phase + ", deliveries " + run.delivered));
             update(statusLabel, status);
@@ -680,6 +884,7 @@ public final class StasisCourier extends Module {
     }
 
     private record StationBlock(ResourceKey<Level> dimension, BlockPos pos) {}
+    private record TrapButtonMark(ResourceKey<Level> dimension, BlockHitResult hit, BlockState readyState) {}
     private record ThrowPose(ResourceKey<Level> dimension, Vec3 position, float yaw, float pitch) {}
 
     private static final class Run {
@@ -692,7 +897,9 @@ public final class StasisCourier extends Module {
         private CourierTransfer transfer;
         private List<ItemStack> cargo = List.of(), enderBaseline = List.of();
         private final Set<UUID> priorPearls = new HashSet<>();
-        private UUID pearl;
+        private UUID pearl, sourcePearl;
+        private int pearlSeenAt;
+        private boolean armingSource, trialRecallObserved;
         private LocalPlayer deadPlayer;
         private boolean deathObserved;
         private boolean respawnRequested, respawnObserved;

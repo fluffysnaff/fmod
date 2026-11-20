@@ -7,7 +7,7 @@ import meteordevelopment.meteorclient.systems.modules.Modules;
 import net.minecraft.client.multiplayer.ClientSuggestionProvider;
 
 public final class StashMoverCommand extends Command {
-    public StashMoverCommand(){super("stashmover","Control FMod's bed-return stash mover.","sm");}
+    public StashMoverCommand(){super("stashmover","Control FMod's stash mover.","sm");}
     private StasisCourier module(){return Modules.get().get(StasisCourier.class);}
     @Override public void build(LiteralArgumentBuilder<ClientSuggestionProvider> builder){
         builder.executes(context->{module().printStatus();return SINGLE_SUCCESS;});

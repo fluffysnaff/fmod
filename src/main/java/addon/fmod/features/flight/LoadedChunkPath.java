@@ -9,6 +9,22 @@ public final class LoadedChunkPath {
 
     private LoadedChunkPath() {}
 
+    /**
+     * Largest fraction of the move (0..1) that keeps the swept box inside loaded chunks.
+     * Returns 1 when the whole move is clear, letting flight glide up to the loaded frontier
+     * instead of stopping a chunk early or stuttering.
+     */
+    public static double maxFraction(double minX, double minZ, double maxX, double maxZ, double dx, double dz, Chunks chunks) {
+        if (canMove(minX, minZ, maxX, maxZ, dx, dz, chunks)) return 1.0;
+        double lo = 0.0, hi = 1.0;
+        for (int i = 0; i < 12; i++) {
+            double mid = (lo + hi) * 0.5;
+            if (canMove(minX, minZ, maxX, maxZ, dx * mid, dz * mid, chunks)) lo = mid;
+            else hi = mid;
+        }
+        return lo;
+    }
+
     public static boolean canMove(double minX, double minZ, double maxX, double maxZ, double dx, double dz, Chunks chunks) {
         if (!Double.isFinite(minX) || !Double.isFinite(minZ) || !Double.isFinite(maxX) || !Double.isFinite(maxZ)
             || !Double.isFinite(dx) || !Double.isFinite(dz) || minX >= maxX || minZ >= maxZ) return false;

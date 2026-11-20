@@ -3,9 +3,12 @@ package addon.fmod.stashhunting.modules.searcharea.modes;
 import addon.fmod.stashhunting.modules.searcharea.SearchAreaMode;
 import addon.fmod.stashhunting.modules.searcharea.SearchArea;
 import addon.fmod.stashhunting.modules.searcharea.SearchAreaModes;
+import addon.fmod.stashhunting.modules.searcharea.VolytraRoutePilot;
 import meteordevelopment.meteorclient.utils.player.Rotations;
 import net.minecraft.core.BlockPos;
 import java.io.*;
+import java.util.ArrayList;
+import java.util.List;
 
 import static addon.fmod.stashhunting.Utils.*;
 import static meteordevelopment.meteorclient.utils.player.ChatUtils.info;
@@ -15,6 +18,12 @@ public class Spiral extends SearchAreaMode
     private PathingDataSpiral pd;
     private boolean goingToStart = true;
     private long startTime;
+
+    private boolean useVolytra;
+    private VolytraRoutePilot pilot;
+    private int spiralCenterX, spiralCenterZ;
+    private int lastSavedIndex = -1;
+    private boolean routeComplete;
 
     public Spiral(SearchArea owner)
     {
@@ -46,19 +55,75 @@ public class Spiral extends SearchAreaMode
                 }
             }
 
+        useVolytra = searchArea.flightController.get() == SearchArea.FlightController.VolytraFly;
+        if (useVolytra) {
+            VolytraProgress vp = loadVolytraProgress();
+            if (vp != null) {
+                spiralCenterX = vp.originX;
+                spiralCenterZ = vp.originZ;
+            } else {
+                spiralCenterX = mc.player.blockPosition().getX();
+                spiralCenterZ = mc.player.blockPosition().getZ();
+            }
+            pilot = new VolytraRoutePilot(buildCorners(spiralCenterX, spiralCenterZ));
+            if (!pilot.available()) {
+                searchArea.error("VolytraFly module not found; falling back to keyboard control.");
+                useVolytra = false;
+            } else {
+                pilot.start(vp != null ? vp.index : 0);
+                lastSavedIndex = pilot.index();
+                routeComplete = false;
+                if (!pilot.ready()) searchArea.warning("Enable VolytraFly and start gliding; Search Area will fly the spiral once it is on.");
+            }
+        }
     }
 
     @Override
     public void onDeactivate()
     {
+        if (useVolytra && pilot != null) {
+            if (routeComplete) clearVolytraProgress();
+            else saveVolytraProgress(spiralCenterX, spiralCenterZ, pilot.index());
+        }
+        if (pilot != null) pilot.stop();
         super.onDeactivate();
         super.saveToJson(goingToStart, pd);
 
     }
 
+    private List<int[]> buildCorners(int x, int z) {
+        int gap = 16 * searchArea.rowGap.get();
+        int[][] dirs = {{1, 0}, {0, 1}, {-1, 0}, {0, -1}}; // +X, +Z, -X, -Z, matching the keyboard spiral
+
+        List<int[]> corners = new ArrayList<>();
+        corners.add(new int[]{x, z}); // centre
+        for (int n = 1; n <= 40000; n++) {
+            int len = ((n + 1) / 2) * gap; // leg lengths: g, g, 2g, 2g, 3g, 3g, ...
+            int[] d = dirs[(n - 1) % 4];
+            x += d[0] * len;
+            z += d[1] * len;
+            corners.add(new int[]{x, z});
+            if (Math.abs((long) x) > 29000000 || Math.abs((long) z) > 29000000) break;
+        }
+        return corners;
+    }
+
     @Override
     public void onTick()
     {
+        if (useVolytra) {
+            if (pilot != null) {
+                boolean done = pilot.tick(mc);
+                int idx = pilot.index();
+                if (idx != lastSavedIndex) {
+                    lastSavedIndex = idx;
+                    saveVolytraProgress(spiralCenterX, spiralCenterZ, idx);
+                }
+                if (done) { routeComplete = true; searchArea.toggle(); }
+            }
+            return;
+        }
+
         // autosave every 10 minutes in case of crashes
         if (System.nanoTime() - startTime > 6e11)
         {

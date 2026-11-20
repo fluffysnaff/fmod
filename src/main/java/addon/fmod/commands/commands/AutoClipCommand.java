@@ -36,7 +36,7 @@ public class AutoClipCommand extends Command {
             errOut.append(Component.literal("Clipping ").withStyle(ChatFormatting.GRAY));
             errOut.append(Component.literal(String.format(" %d blocks", (int)pos.y - (int)mc.player.position().y)).withStyle(ChatFormatting.DARK_PURPLE));
             ChatUtils.sendMsg(errOut);
-            WarpUtils.warpTo(pos, 18);
+            WarpUtils.warp(pos);
             return SINGLE_SUCCESS;
         }));
     }

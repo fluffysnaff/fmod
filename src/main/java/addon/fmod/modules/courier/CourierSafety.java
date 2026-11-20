@@ -1,13 +1,13 @@
 package addon.fmod.modules.courier;
 
-/** The final death-command gate, evaluated again immediately before sending the command. */
+/** The final pre-return checks shared by both return modes. */
 public final class CourierSafety {
     private CourierSafety() {}
 
     public record ReturnCheck(boolean alive, boolean atDestination, boolean shipmentStored,
                               boolean recallPrepared, boolean mainEmpty, boolean equipmentEmpty,
                               boolean craftingEmpty, boolean cursorEmpty, boolean menuClosed) {
-        public boolean mayDie() {
+        public boolean ready() {
             return alive && atDestination && shipmentStored && recallPrepared && mainEmpty
                 && equipmentEmpty && craftingEmpty && cursorEmpty && menuClosed;
         }

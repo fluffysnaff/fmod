@@ -85,15 +85,63 @@ public class SearchAreaMode
         public boolean mainPath;
     }
 
+    // --- VolytraFly route progress (separate from the keyboard PathingData) ---
+
+    protected static class VolytraProgress
+    {
+        public int originX;
+        public int originZ;
+        public int index;
+    }
+
+    protected VolytraProgress loadVolytraProgress()
+    {
+        File file = getJsonFile(type + "-volytra");
+        if (file == null || !file.exists()) return null;
+        try (FileReader reader = new FileReader(file)) {
+            return GSON.fromJson(reader, VolytraProgress.class);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    protected void saveVolytraProgress(int originX, int originZ, int index)
+    {
+        File file = getJsonFile(type + "-volytra");
+        if (file == null) return;
+        VolytraProgress vp = new VolytraProgress();
+        vp.originX = originX;
+        vp.originZ = originZ;
+        vp.index = index;
+        try {
+            file.getParentFile().mkdirs();
+            try (Writer writer = new FileWriter(file)) {
+                GSON.toJson(vp, writer);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    protected void clearVolytraProgress()
+    {
+        File file = getJsonFile(type + "-volytra");
+        if (file != null && file.exists() && !file.delete()) searchArea.error("Could not delete saved VolytraFly route.");
+    }
+
     public void clear()
     {
-        File file = getJsonFile(type.toString());
-        if (file != null && file.exists() && !file.delete()) searchArea.error("Could not delete saved path.");
+        clear(type.toString());
     }
 
     public void clear(String mode)
     {
-        File file = getJsonFile(mode);
+        deleteSavedFile(getJsonFile(mode));
+        deleteSavedFile(getJsonFile(mode + "-volytra")); // also reset any VolytraFly route progress
+    }
+
+    private void deleteSavedFile(File file)
+    {
         if (file != null && file.exists() && !file.delete()) searchArea.error("Could not delete saved path.");
     }
 

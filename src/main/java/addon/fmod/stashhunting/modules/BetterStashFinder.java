@@ -369,6 +369,10 @@ public class BetterStashFinder extends Module
 
         WVerticalList list = theme.verticalList();
 
+        // Open the full map / analysis screen
+        WButton openMap = list.add(theme.button("Open Stash Map")).widget();
+        openMap.action = () -> mc.setScreenAndShow(new addon.fmod.stashhunting.gui.StashMapScreen(theme));
+
         // Clear
         WButton clear = list.add(theme.button("Clear")).widget();
 
@@ -607,6 +611,42 @@ public class BetterStashFinder extends Module
         }
     }
 
+
+    /** GUI hooks: add/remove a single find's Xaero waypoint and persist deletions. */
+    public void addWaypointFor(Chunk chunk) {
+        WaypointSet waypointSet = getWaypointSet();
+        if (waypointSet == null) return;
+        addToWaypoints(waypointSet, chunk);
+        SupportMods.xaeroMinimap.requestWaypointsRefresh();
+    }
+
+    public void addAllWaypoints() {
+        WaypointSet waypointSet = getWaypointSet();
+        if (waypointSet == null) return;
+        for (Chunk chunk : chunks) addToWaypoints(waypointSet, chunk);
+        SupportMods.xaeroMinimap.requestWaypointsRefresh();
+    }
+
+    public void deleteFind(Chunk chunk) {
+        if (!chunks.remove(chunk)) return;
+        saveJson();
+        saveCsv();
+        Waypoint waypoint = getWaypointByCoordinate(chunk.x, chunk.z);
+        if (waypoint != null) {
+            WaypointSet waypointSet = getWaypointSet();
+            if (waypointSet != null) {
+                waypointSet.remove(waypoint);
+                SupportMods.xaeroMinimap.requestWaypointsRefresh();
+            }
+        }
+    }
+
+    public void clearFinds() {
+        removeAllStashWaypoints(chunks);
+        chunks.clear();
+        saveJson();
+        saveCsv();
+    }
 
     public enum Mode {
         Chat,

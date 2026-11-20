@@ -27,6 +27,13 @@ public class SearchArea extends Module {
         .build()
     );
 
+    public final Setting<FlightController> flightController = sgGeneral.add(new EnumSetting.Builder<FlightController>()
+        .name("flight")
+        .description("Keyboard holds forward and steers your yaw (pair it with a fly-where-you-look controller like boat-fly or ElytraFly). VolytraFly hands the route (rectangle or spiral) to VolytraFly's Autonav instead.")
+        .defaultValue(FlightController.Keyboard)
+        .build()
+    );
+
     public final Setting<BlockPos> startPos = sgGeneral.add(new BlockPosSetting.Builder()
         .name("start-position")
         .description("The coordinates to start the rectangle at. Y Pos is ignored")
@@ -115,6 +122,11 @@ public class SearchArea extends Module {
             case Spiral -> currentMode = new Spiral(this);
         }
         if (active) currentMode.onActivate();
+    }
+
+    public enum FlightController {
+        Keyboard,
+        VolytraFly
     }
 
     public enum WebhookSettings
