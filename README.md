@@ -3,7 +3,7 @@
 
   <h1>FMod</h1>
 
-  <p>Stash hunting, travel and streaming tools for Meteor Client on Minecraft 26.3.</p>
+  <p>Stash hunting, travel and coordinate hiding for Meteor Client on Minecraft 26.3.</p>
 
   <p>
     <a href="https://github.com/fluffysnaff/fmod/releases/tag/v0.4.0"><b>Download v0.4.0</b></a>
@@ -22,6 +22,10 @@ The **0.4.0 release** adds commandless Stash Mover returns, EventlessFly, Knockb
 
 ## Features
 
+<table>
+<tr>
+<td valign="top">
+
 - **Find stashes.** Search Area moves you through a rectangle or a spiral. Better Stash Finder saves every chest it finds to CSV and JSON files.
 - **Follow trails.** Old Chunk Notifier tells you when you reach chunks from an older Minecraft version, where players were long ago. TrailFollower and Trail Maker follow a trail for you.
 - **Use Meteor flight while following trails.** TrailFollower can enable Meteor's built-in ElytraFly with your existing settings, and restores only the activation state it owns.
@@ -35,6 +39,14 @@ The **0.4.0 release** adds commandless Stash Mover returns, EventlessFly, Knockb
 
 [All features and settings](docs/FEATURES.md)
 
+</td>
+<td valign="top" width="186">
+  <img src="docs/assets/readme/modules.png" width="186" alt="The FMod category in Meteor's module menu, from Anti Map Crash to Volytra Fly">
+  <p><sub>The FMod menu in game, with the optional mods installed.</sub></p>
+</td>
+</tr>
+</table>
+
 ## Install
 
 1. Install [Meteor Client](https://meteorclient.com/download) for Minecraft 26.3. You need Fabric Loader 0.19.5 or newer and Java 25 or newer.
@@ -47,11 +59,24 @@ Many servers do not allow client mods. Read a server's rules before you use FMod
 
 ## Stash Mover setup
 
+Stash Mover needs two stations: a source where the courier account loads shulker boxes, and a destination where it unloads them. This is a TrapButton route built in a test world:
+
+<table>
+<tr>
+<td width="50%"><img src="docs/assets/readme/stash-mover-source.png" alt="Source station: a red bed, a chest and an Ender Chest on a stone floor"></td>
+<td width="50%"><img src="docs/assets/readme/stash-mover-destination.png" alt="Destination station: a glass stasis chamber with an ender pearl at the top of the water, a chest, an Ender Chest, and an iron trapdoor over lava with a stone button beside it"></td>
+</tr>
+<tr>
+<td valign="top"><b>Source.</b> The courier's respawn bed, a chest with filled shulker boxes, and an Ender Chest.</td>
+<td valign="top"><b>Destination.</b> A stasis chamber that holds the courier's pearl, a chest for the delivery, and an Ender Chest. The courier lands on the iron trapdoor. After unloading, it presses the button, falls into the lava and respawns at the source bed.</td>
+</tr>
+</table>
+
 In game, open Meteor with **Right Shift**, then right-click **Stash Mover** in the **FMod** category. Enable the module on the courier account before marking either station.
 
 ### 1. Choose the return mode
 
-![Stash Mover's General settings with TrapButton selected as the return mode](docs/assets/readme/stash-mover-mode.png)
+Set **Return Mode** in the module's General settings.
 
 | Return mode | What to set up |
 | --- | --- |
@@ -63,7 +88,7 @@ For **KillCommand** and **TrapButton**, a stasis recall needs the destination pe
 
 ### 2. Mark stations and run the empty trials
 
-![Expanded Source setup and Destination setup showing the bed, chest, pearl region, and trap button controls above the empty trial button](docs/assets/readme/stash-mover-setup.png)
+The **Source setup** and **Destination setup** groups in the module settings have one button for each block to mark.
 
 1. Look at each block before opening the setup menu to mark it. Mark a reachable **chest or barrel** at each station. Mark both Ender Chests if you use the default **EnderChest** cargo mode.
 2. Capture the destination landing pose. For **Stasis**, aim into the chamber while capturing the pose, then mark the resting pearl region. For **ReturnPearl**, capture the source pose and mark the source chamber too. Stock spare pearls at each station where the courier will rearm.
